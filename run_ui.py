@@ -35,12 +35,13 @@ def main():
     ui_app_path = os.path.join(script_dir, "ui", "app.py")
 
     try:
-        # Launch Streamlit
+        # Launch Streamlit with configuration to skip email setup
         subprocess.run([
             sys.executable, "-m", "streamlit", "run", ui_app_path,
             "--server.headless", "false",
             "--server.port", "8501",
-            "--server.address", "localhost"
+            "--server.address", "localhost",
+            "--browser.gatherUsageStats", "false"
         ])
     except KeyboardInterrupt:
         print("\n🛑 Shutting down UI server...")
