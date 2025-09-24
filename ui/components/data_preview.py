@@ -3,7 +3,6 @@ Data preview components for market data visualization.
 """
 
 import streamlit as st
-import plotly.graph_objects as go
 import sys
 import os
 
@@ -13,6 +12,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(
 from src.database import create_db_connection
 from src.data_fetcher import fetch_market_data
 import symbols_config
+from .chart_utils import create_interactive_candlestick_chart
 
 
 def show_data_preview():
@@ -66,28 +66,30 @@ def show_data_preview():
                 st.subheader("📋 Data Sample")
                 st.dataframe(df.head(20), use_container_width=True)
 
-                # Simple price chart
-                st.subheader("📈 Price Chart (Last 1000 records)")
-                chart_data = df.tail(1000)
+                # Interactive price chart
+                st.subheader("📈 Interactive Price Chart")
 
-                fig = go.Figure()
-                fig.add_trace(go.Candlestick(
-                    x=chart_data['timestamp'],
-                    open=chart_data['open'],
-                    high=chart_data['high'],
-                    low=chart_data['low'],
-                    close=chart_data['close'],
-                    name=selected_symbol
-                ))
+                # Chart controls
+                col1, col2 = st.columns([3, 1])
+                with col1:
+                    st.caption("🖱️ **Mouse Controls**: Wheel to zoom • Click & drag to pan • Double-click to reset")
+                with col2:
+                    data_points = st.selectbox(
+                        "Data points:",
+                        [500, 1000, 2000, 5000, "All"],
+                        index=1,
+                        help="Select number of recent data points to display"
+                    )
 
-                fig.update_layout(
-                    title=f"{selected_symbol} Price Chart",
-                    xaxis_title="Time",
-                    yaxis_title="Price",
-                    height=500
-                )
+                # Prepare chart data based on selection
+                if data_points == "All":
+                    chart_data = df
+                else:
+                    chart_data = df.tail(data_points)
 
-                st.plotly_chart(fig, use_container_width=True)
+                # Create and display interactive chart
+                fig, config = create_interactive_candlestick_chart(chart_data, selected_symbol)
+                st.plotly_chart(fig, use_container_width=True, config=config)
 
             except Exception as e:
                 st.error(f"❌ Error loading data for {selected_symbol}: {str(e)}")
