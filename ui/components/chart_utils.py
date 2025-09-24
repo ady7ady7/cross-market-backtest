@@ -22,7 +22,7 @@ def create_interactive_candlestick_chart(chart_data, symbol_name, height=600):
 
     fig = go.Figure()
 
-    # Add candlestick trace
+    # Add candlestick trace with enhanced dark theme colors
     fig.add_trace(go.Candlestick(
         x=chart_data['timestamp'],
         open=chart_data['open'],
@@ -30,18 +30,22 @@ def create_interactive_candlestick_chart(chart_data, symbol_name, height=600):
         low=chart_data['low'],
         close=chart_data['close'],
         name=symbol_name,
-        increasing_line_color='#00ff88',
-        decreasing_line_color='#ff4444',
-        increasing_fillcolor='#00ff88',
-        decreasing_fillcolor='#ff4444'
+        increasing_line_color='#00dd77',
+        decreasing_line_color='#ff5555',
+        increasing_fillcolor='rgba(0, 221, 119, 0.8)',
+        decreasing_fillcolor='rgba(255, 85, 85, 0.8)'
     ))
 
-    # Enhanced layout for smooth interactivity
+    # Enhanced layout for smooth interactivity with dark theme
     fig.update_layout(
-        title=f"{symbol_name} Price Chart - Interactive",
+        title=dict(
+            text=f"{symbol_name} Price Chart - Interactive",
+            font=dict(color='#e0e0e0', size=16)
+        ),
         xaxis_title="Time",
         yaxis_title="Price",
         height=height,
+        font=dict(color='#e0e0e0'),
 
         # Enhanced interactivity settings
         dragmode='pan',
@@ -55,7 +59,14 @@ def create_interactive_candlestick_chart(chart_data, symbol_name, height=600):
             spikesnap='cursor',
             showline=True,
             showgrid=True,
-            fixedrange=False  # Allow zoom on x-axis
+            gridcolor='#404040',
+            linecolor='#606060',
+            tickfont=dict(color='#e0e0e0'),
+            titlefont=dict(color='#e0e0e0'),
+            fixedrange=False,  # Allow zoom on x-axis
+            # Improved axis interaction
+            autorange=True,
+            constrain="domain"
         ),
 
         yaxis=dict(
@@ -64,15 +75,22 @@ def create_interactive_candlestick_chart(chart_data, symbol_name, height=600):
             spikesnap='cursor',
             showline=True,
             showgrid=True,
-            fixedrange=False  # Allow zoom on y-axis
+            gridcolor='#404040',
+            linecolor='#606060',
+            tickfont=dict(color='#e0e0e0'),
+            titlefont=dict(color='#e0e0e0'),
+            fixedrange=False,  # Allow zoom on y-axis
+            # Improved axis interaction
+            autorange=True,
+            constrain="domain"
         ),
 
         # Hover configuration for better UX
         hovermode='x unified',
 
-        # Professional styling
-        plot_bgcolor='white',
-        paper_bgcolor='white',
+        # Dark theme styling
+        plot_bgcolor='#1e1e1e',
+        paper_bgcolor='#2d2d2d',
 
         # Remove margins for more chart space
         margin=dict(l=0, r=0, t=40, b=0),
@@ -82,23 +100,25 @@ def create_interactive_candlestick_chart(chart_data, symbol_name, height=600):
         annotations=[]
     )
 
-    # Configure advanced interactivity
+    # Configure advanced interactivity - clean and focused
     config = {
         'displayModeBar': True,
         'displaylogo': False,
-        'modeBarButtonsToAdd': [
-            'drawline',
-            'drawopenpath',
-            'drawclosedpath',
-            'drawcircle',
-            'drawrect',
-            'eraseshape'
+        'modeBarButtonsToRemove': [
+            'lasso2d', 'select2d', 'drawline', 'drawopenpath',
+            'drawclosedpath', 'drawcircle', 'drawrect', 'eraseshape'
         ],
-        'modeBarButtonsToRemove': ['lasso2d', 'select2d'],
         'scrollZoom': True,  # Enable mouse wheel zoom
         'doubleClick': 'reset+autosize',  # Double click to reset zoom
         'showTips': True,
-        'responsive': True
+        'responsive': True,
+        'toImageButtonOptions': {
+            'format': 'png',
+            'filename': f'{symbol_name}_chart',
+            'height': height,
+            'width': 1200,
+            'scale': 1
+        }
     }
 
     return fig, config

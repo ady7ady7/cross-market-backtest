@@ -33,10 +33,12 @@ st.plotly_chart(fig, use_container_width=True, config=config)
 ```
 
 ## Features Implemented
-- ✅ Mouse wheel zoom (both X and Y axes)
-- ✅ Click and drag panning
-- ✅ Smooth, frictionless scaling
+- ✅ Mouse wheel zoom (both X and Y axes) - consistent throughout axis
+- ✅ Click and drag panning - smooth movement
+- ✅ Smooth, frictionless scaling with no lag
 - ✅ Double-click to reset zoom
-- ✅ Drawing tools for analysis
+- ✅ Dark theme styling for professional look
+- ✅ Clean interface (no drawing tools clutter)
+- ✅ Data points selector that doesn't cause reload
 - ✅ Modular design for reuse
 - ✅ Future trade visualization support

@@ -41,55 +41,69 @@ def show_data_preview():
 
         table_name = symbol_info['table_name']
 
-        # Load and display data
+        # Initialize session state for current symbol data
+        current_data_key = f"current_data_{selected_symbol}"
+
+        # Load data button
         if st.button(f"📈 Load Data for {selected_symbol}", type="primary"):
             try:
                 with st.spinner(f"Loading {selected_symbol} data..."):
                     engine = create_db_connection()
                     df = fetch_market_data(engine, table_name, selected_symbol)
                     st.session_state.market_data[table_name] = df
-
-                # Display data info
-                col1, col2, col3, col4 = st.columns(4)
-                with col1:
-                    st.metric("Total Records", len(df))
-                with col2:
-                    st.metric("Date Range", f"{(df['timestamp'].max() - df['timestamp'].min()).days} days")
-                with col3:
-                    st.metric("Asset Type", symbol_info['asset_type'].upper())
-                with col4:
-                    if 'volume' in df.columns:
-                        avg_volume = df['volume'].mean()
-                        st.metric("Avg Volume", f"{avg_volume:.2f}")
-
-                # Data preview
-                st.subheader("📋 Data Sample")
-                st.dataframe(df.head(20), use_container_width=True)
-
-                # Interactive price chart
-                st.subheader("📈 Interactive Price Chart")
-
-                # Chart controls
-                col1, col2 = st.columns([3, 1])
-                with col1:
-                    st.caption("🖱️ **Mouse Controls**: Wheel to zoom • Click & drag to pan • Double-click to reset")
-                with col2:
-                    data_points = st.selectbox(
-                        "Data points:",
-                        [500, 1000, 2000, 5000, "All"],
-                        index=1,
-                        help="Select number of recent data points to display"
-                    )
-
-                # Prepare chart data based on selection
-                if data_points == "All":
-                    chart_data = df
-                else:
-                    chart_data = df.tail(data_points)
-
-                # Create and display interactive chart
-                fig, config = create_interactive_candlestick_chart(chart_data, selected_symbol)
-                st.plotly_chart(fig, use_container_width=True, config=config)
+                    st.session_state[current_data_key] = df
 
             except Exception as e:
                 st.error(f"❌ Error loading data for {selected_symbol}: {str(e)}")
+                return
+
+        # Check if we have data for the current symbol
+        if current_data_key in st.session_state or table_name in st.session_state.market_data:
+            # Get the data from session state
+            if current_data_key in st.session_state:
+                df = st.session_state[current_data_key]
+            else:
+                df = st.session_state.market_data[table_name]
+
+            # Display data info
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("Total Records", len(df))
+            with col2:
+                st.metric("Date Range", f"{(df['timestamp'].max() - df['timestamp'].min()).days} days")
+            with col3:
+                st.metric("Asset Type", symbol_info['asset_type'].upper())
+            with col4:
+                if 'volume' in df.columns:
+                    avg_volume = df['volume'].mean()
+                    st.metric("Avg Volume", f"{avg_volume:.2f}")
+
+            # Data preview
+            st.subheader("📋 Data Sample")
+            st.dataframe(df.head(20), use_container_width=True)
+
+            # Interactive price chart
+            st.subheader("📈 Interactive Price Chart")
+
+            # Chart controls
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                st.caption("🖱️ **Mouse Controls**: Wheel to zoom • Click & drag to pan • Double-click to reset")
+            with col2:
+                data_points = st.selectbox(
+                    "Data points:",
+                    [500, 1000, 2000, 5000, "All"],
+                    index=1,
+                    help="Select number of recent data points to display",
+                    key=f"data_points_{selected_symbol}"
+                )
+
+            # Prepare chart data based on selection
+            if data_points == "All":
+                chart_data = df
+            else:
+                chart_data = df.tail(data_points)
+
+            # Create and display interactive chart
+            fig, config = create_interactive_candlestick_chart(chart_data, selected_symbol)
+            st.plotly_chart(fig, use_container_width=True, config=config)
