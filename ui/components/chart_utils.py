@@ -62,7 +62,7 @@ def create_interactive_candlestick_chart(chart_data, symbol_name, height=600):
             gridcolor='#404040',
             linecolor='#606060',
             tickfont=dict(color='#e0e0e0'),
-            titlefont=dict(color='#e0e0e0'),
+            title=dict(font=dict(color='#e0e0e0')),
             fixedrange=False,  # Allow zoom on x-axis
             # Improved axis interaction
             autorange=True,
@@ -78,7 +78,7 @@ def create_interactive_candlestick_chart(chart_data, symbol_name, height=600):
             gridcolor='#404040',
             linecolor='#606060',
             tickfont=dict(color='#e0e0e0'),
-            titlefont=dict(color='#e0e0e0'),
+            title=dict(font=dict(color='#e0e0e0')),
             fixedrange=False,  # Allow zoom on y-axis
             # Improved axis interaction
             autorange=True,
