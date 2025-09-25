@@ -7,6 +7,7 @@ import streamlit as st
 import sys
 import os
 from typing import Dict, Any, List
+from datetime import time
 
 # Add parent directory to path to import our modules
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
@@ -59,7 +60,7 @@ class IndicatorConfigManager:
         with col1:
             start_time = st.time_input(
                 "Daily Start Time",
-                value=st.time(0, 0),
+                value=time(0, 0),
                 help="Start time for daily OHLC calculation",
                 key=f"{key_prefix}_pivot_start_time"
             )
@@ -68,7 +69,7 @@ class IndicatorConfigManager:
         with col2:
             end_time = st.time_input(
                 "Daily End Time",
-                value=st.time(23, 59),
+                value=time(23, 59),
                 help="End time for daily OHLC calculation",
                 key=f"{key_prefix}_pivot_end_time"
             )
