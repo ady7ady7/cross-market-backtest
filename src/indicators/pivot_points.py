@@ -87,6 +87,27 @@ class PivotPoints(BaseIndicator):
 
         return date_data[mask]
 
+    def _find_last_trading_day(self, data: pd.DataFrame, current_date: pd.Timestamp) -> pd.Timestamp:
+        """
+        Find the last available trading day before current_date.
+        Handles weekends, holidays, and market gaps.
+
+        Args:
+            data: OHLCV data
+            current_date: Current date to find previous trading day for
+
+        Returns:
+            Date of last available trading day, or None if not found
+        """
+        # Get all available dates before current date
+        available_dates = data[data['timestamp'].dt.date < current_date.date()]['timestamp'].dt.date.unique()
+
+        if len(available_dates) == 0:
+            return None
+
+        # Return the most recent available date
+        return pd.Timestamp(max(available_dates))
+
     def _calculate_daily_ohlc(self, data: pd.DataFrame, date: pd.Timestamp) -> Tuple[float, float, float, float]:
         """
         Calculate daily OHLC values for a specific date.
@@ -151,6 +172,7 @@ class PivotPoints(BaseIndicator):
     def calculate(self, data: pd.DataFrame) -> pd.DataFrame:
         """
         Calculate pivot points for all trading days.
+        Uses last available trading day to handle weekends/holidays properly.
 
         Args:
             data: OHLCV DataFrame
@@ -165,41 +187,50 @@ class PivotPoints(BaseIndicator):
         data['timestamp'] = pd.to_datetime(data['timestamp'])
         data = data.sort_values('timestamp')
 
-        # Get unique dates
-        dates = data['timestamp'].dt.date.unique()
-        dates = sorted(dates)
+        # Get unique dates that actually have data
+        available_dates = sorted(data['timestamp'].dt.date.unique())
 
         # Initialize result DataFrame
         result_data = []
 
-        for i, current_date in enumerate(dates[1:], 1):  # Start from second date
-            prev_date = dates[i-1]
+        # Process each available trading day
+        for current_date in available_dates:
+            current_timestamp = pd.Timestamp(current_date)
 
-            # Calculate previous day's OHLC
+            # Find the last available trading day before current date
+            last_trading_day = self._find_last_trading_day(data, current_timestamp)
+
+            if last_trading_day is None:
+                # First trading day - no previous data available
+                continue
+
+            # Calculate previous trading day's OHLC
             prev_open, prev_high, prev_low, prev_close = self._calculate_daily_ohlc(
-                data, pd.Timestamp(prev_date)
+                data, last_trading_day
             )
 
             if prev_high is None or prev_low is None or prev_close is None:
                 continue
 
-            # Calculate pivot levels
+            # Calculate pivot levels using last available trading day's data
             levels = self._calculate_pivot_levels(prev_high, prev_low, prev_close)
 
-            # Get all timestamps for current date
+            # Get all timestamps for current trading day
             current_day_data = data[data['timestamp'].dt.date == current_date]
 
+            # Create pivot point entries for each timestamp on current day
             for _, row in current_day_data.iterrows():
                 result_row = {
                     'timestamp': row['timestamp'],
-                    'date': current_date
+                    'date': current_date,
+                    'prev_trading_date': last_trading_day.date()
                 }
                 result_row.update(levels)
                 result_data.append(result_row)
 
         if not result_data:
             # Return empty DataFrame with proper structure
-            columns = ['timestamp', 'date', 'P', 'R1', 'R2', 'R3', 'R4', 'R5', 'S1', 'S2', 'S3', 'S4', 'S5']
+            columns = ['timestamp', 'date', 'prev_trading_date', 'P', 'R1', 'R2', 'R3', 'R4', 'R5', 'S1', 'S2', 'S3', 'S4', 'S5']
             return pd.DataFrame(columns=columns)
 
         result_df = pd.DataFrame(result_data)
@@ -211,6 +242,7 @@ class PivotPoints(BaseIndicator):
     def get_plot_data(self) -> Dict[str, Any]:
         """
         Get pivot points data formatted for plotting.
+        Creates separate horizontal line segments for each trading day.
 
         Returns:
             Dictionary with plot traces for each pivot level
@@ -237,22 +269,51 @@ class PivotPoints(BaseIndicator):
             'S5': {'color': colors['support'], 'name': 'Support 5', 'dash': 'longdash'}
         }
 
+        # Group data by trading date to create separate line segments
+        grouped_data = self.data.groupby('date')
+
         for level, config in level_config.items():
             if show_levels.get(level, False) and level in self.data.columns:
-                traces.append({
-                    'type': 'scatter',
-                    'mode': 'lines',
-                    'x': self.data['timestamp'],
-                    'y': self.data[level],
-                    'name': config['name'],
-                    'line': {
-                        'color': config['color'],
-                        'width': 1,
-                        'dash': config['dash']
-                    },
-                    'showlegend': True,
-                    'hovertemplate': f"{config['name']}: %{{y:.4f}}<br>Time: %{{x}}<extra></extra>"
-                })
+
+                # Create separate traces for each day to avoid connecting lines
+                x_segments = []
+                y_segments = []
+
+                for date, day_data in grouped_data:
+                    if not day_data.empty:
+                        # Add horizontal line segment for this day
+                        day_data_sorted = day_data.sort_values('timestamp')
+                        x_day = day_data_sorted['timestamp'].tolist()
+                        y_day = [day_data_sorted[level].iloc[0]] * len(x_day)  # Constant level for the day
+
+                        # Add to segments
+                        x_segments.extend(x_day)
+                        x_segments.append(None)  # None creates a break in the line
+
+                        y_segments.extend(y_day)
+                        y_segments.append(None)
+
+                # Remove the last None values
+                if x_segments and x_segments[-1] is None:
+                    x_segments = x_segments[:-1]
+                    y_segments = y_segments[:-1]
+
+                if x_segments:  # Only add trace if we have data
+                    traces.append({
+                        'type': 'scatter',
+                        'mode': 'lines',
+                        'x': x_segments,
+                        'y': y_segments,
+                        'name': config['name'],
+                        'line': {
+                            'color': config['color'],
+                            'width': 1,
+                            'dash': config['dash']
+                        },
+                        'showlegend': True,
+                        'connectgaps': False,  # Important: don't connect gaps
+                        'hovertemplate': f"{config['name']}: %{{y:.4f}}<br>Time: %{{x}}<extra></extra>"
+                    })
 
         return {
             'traces': traces,
