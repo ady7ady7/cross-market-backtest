@@ -13,6 +13,7 @@ from src.database import create_db_connection
 from src.data_fetcher import fetch_market_data
 import symbols_config
 from .chart_utils import create_interactive_candlestick_chart
+from .indicator_config import IndicatorConfigManager
 
 
 def show_data_preview():
@@ -84,6 +85,47 @@ def show_data_preview():
 
             # Interactive price chart
             st.subheader("📈 Interactive Price Chart")
+
+            # Indicators section
+            with st.expander("🔧 Technical Indicators", expanded=False):
+                indicator_manager = IndicatorConfigManager()
+                available_indicators = indicator_manager.get_available_indicators()
+
+                if available_indicators:
+                    use_indicators = st.checkbox(
+                        "Enable Indicators",
+                        key=f"use_indicators_{selected_symbol}",
+                        help="Add technical indicators to the chart"
+                    )
+
+                    active_indicators = []
+                    if use_indicators:
+                        selected_indicators = st.multiselect(
+                            "Select Indicators:",
+                            available_indicators,
+                            key=f"selected_indicators_{selected_symbol}",
+                            help="Choose which indicators to display"
+                        )
+
+                        for indicator_name in selected_indicators:
+                            st.markdown(f"---")
+                            config = indicator_manager.create_indicator_config_ui(
+                                indicator_name,
+                                f"{selected_symbol}_{indicator_name}"
+                            )
+
+                            try:
+                                indicator = indicator_manager.create_indicator(indicator_name, config)
+                                active_indicators.append(indicator)
+                            except Exception as e:
+                                st.error(f"Error creating {indicator_name}: {str(e)}")
+
+                    # Store indicators in session state for reuse
+                    indicators_key = f"active_indicators_{selected_symbol}"
+                    st.session_state[indicators_key] = active_indicators
+                else:
+                    st.info("No indicators available.")
+                    st.session_state[f"active_indicators_{selected_symbol}"] = []
 
             # Chart controls
             col1, col2 = st.columns([3, 1])
@@ -185,6 +227,31 @@ def show_data_preview():
             else:
                 chart_data = df.tail(data_points)
 
-            # Create and display interactive chart
-            fig, config = create_interactive_candlestick_chart(chart_data, selected_symbol)
+            # Calculate indicators for chart data
+            calculated_indicators = []
+            indicators_key = f"active_indicators_{selected_symbol}"
+
+            if indicators_key in st.session_state and st.session_state[indicators_key]:
+                for indicator in st.session_state[indicators_key]:
+                    try:
+                        # Calculate indicator for the chart data
+                        indicator.calculate(chart_data)
+                        calculated_indicators.append(indicator)
+                    except Exception as e:
+                        st.warning(f"Could not calculate {indicator.name}: {str(e)}")
+
+            # Create and display interactive chart with indicators
+            fig, config = create_interactive_candlestick_chart(
+                chart_data,
+                selected_symbol,
+                indicators=calculated_indicators
+            )
             st.plotly_chart(fig, use_container_width=True, config=config)
+
+            # Display indicator information if any are active
+            if calculated_indicators:
+                st.subheader("📊 Active Indicators")
+                for indicator in calculated_indicators:
+                    if hasattr(indicator, 'data') and indicator.data is not None and not indicator.data.empty:
+                        with st.expander(f"{indicator.name} - Data Sample", expanded=False):
+                            st.dataframe(indicator.data.head(10), use_container_width=True)

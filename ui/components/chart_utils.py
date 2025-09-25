@@ -5,9 +5,10 @@ Designed to be modular and reusable for different components.
 
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+from typing import List, Dict, Any
 
 
-def create_interactive_candlestick_chart(chart_data, symbol_name, height=600):
+def create_interactive_candlestick_chart(chart_data, symbol_name, height=600, indicators=None):
     """
     Create an interactive candlestick chart with enhanced zoom and pan functionality.
 
@@ -15,6 +16,7 @@ def create_interactive_candlestick_chart(chart_data, symbol_name, height=600):
         chart_data: DataFrame with columns ['timestamp', 'open', 'high', 'low', 'close']
         symbol_name: String name of the symbol for chart title
         height: Chart height in pixels (default 600)
+        indicators: List of calculated indicator instances to overlay
 
     Returns:
         tuple: (plotly figure, plotly config dict)
@@ -100,6 +102,30 @@ def create_interactive_candlestick_chart(chart_data, symbol_name, height=600):
         annotations=[]
     )
 
+    # Add indicator overlays if provided
+    if indicators:
+        for indicator in indicators:
+            if hasattr(indicator, 'calculated') and indicator.calculated:
+                plot_data = indicator.get_plot_data()
+
+                # Add indicator traces
+                for trace_data in plot_data.get('traces', []):
+                    if trace_data['type'] == 'scatter':
+                        fig.add_trace(go.Scatter(
+                            x=trace_data['x'],
+                            y=trace_data['y'],
+                            mode=trace_data['mode'],
+                            name=trace_data['name'],
+                            line=trace_data.get('line', {}),
+                            showlegend=trace_data.get('showlegend', True),
+                            hovertemplate=trace_data.get('hovertemplate', None)
+                        ))
+
+                # Apply layout updates if any
+                layout_updates = plot_data.get('layout_updates', {})
+                if layout_updates:
+                    fig.update_layout(**layout_updates)
+
     # Configure advanced interactivity - clean and focused
     config = {
         'displayModeBar': True,
@@ -177,7 +203,7 @@ def add_trade_markers(fig, trades_data):
     return fig
 
 
-def create_chart_with_trades(chart_data, symbol_name, trades_data=None, height=600):
+def create_chart_with_trades(chart_data, symbol_name, trades_data=None, height=600, indicators=None):
     """
     Create an interactive chart with optional trade markers.
     Convenience function that combines candlestick chart with trade visualization.
@@ -187,13 +213,14 @@ def create_chart_with_trades(chart_data, symbol_name, trades_data=None, height=6
         symbol_name: String name of the symbol
         trades_data: Optional DataFrame with trade data
         height: Chart height in pixels
+        indicators: List of calculated indicator instances to overlay
 
     Returns:
         tuple: (plotly figure, plotly config dict)
     """
 
     # Create base chart
-    fig, config = create_interactive_candlestick_chart(chart_data, symbol_name, height)
+    fig, config = create_interactive_candlestick_chart(chart_data, symbol_name, height, indicators)
 
     # Add trades if provided
     if trades_data is not None:
