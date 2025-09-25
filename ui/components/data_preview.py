@@ -92,14 +92,95 @@ def show_data_preview():
             with col2:
                 data_points = st.selectbox(
                     "Data points:",
-                    [500, 1000, 2000, 5000, "All"],
+                    [500, 1000, 2000, 5000, 10000, 20000, "Range Slider"],
                     index=1,
-                    help="Select number of recent data points to display",
+                    help="Select number of recent data points to display or use Range Slider for large datasets",
                     key=f"data_points_{selected_symbol}"
                 )
 
             # Prepare chart data based on selection
-            if data_points == "All":
+            if data_points == "Range Slider":
+                # Initialize session state for range slider
+                slider_key = f"range_slider_{selected_symbol}"
+                if slider_key not in st.session_state:
+                    st.session_state[slider_key] = 0
+
+                total_records = len(df)
+                max_display_points = 15000  # Sweet spot for performance
+
+                # Calculate total number of ranges
+                total_ranges = max(1, (total_records - max_display_points) // 1000 + 1)
+
+                # Range slider and controls
+                st.markdown("---")
+                st.subheader("📊 Data Range Navigation")
+
+                # Display current range info
+                current_start = st.session_state[slider_key] * 1000
+                current_end = min(current_start + max_display_points, total_records)
+
+                col_info1, col_info2, col_info3 = st.columns(3)
+                with col_info1:
+                    start_date = df.iloc[current_start]['timestamp'].strftime('%Y-%m-%d %H:%M')
+                    st.metric("Range Start", start_date)
+                with col_info2:
+                    end_date = df.iloc[current_end-1]['timestamp'].strftime('%Y-%m-%d %H:%M')
+                    st.metric("Range End", end_date)
+                with col_info3:
+                    st.metric("Points Shown", f"{current_end - current_start:,}")
+
+                # Navigation controls
+                col_nav1, col_nav2, col_nav3, col_nav4, col_nav5 = st.columns(5)
+
+                with col_nav1:
+                    if st.button("⏮️ First", help="Go to first range"):
+                        st.session_state[slider_key] = 0
+                        st.rerun()
+
+                with col_nav2:
+                    if st.button("⬅️ Previous", help="Go to previous range"):
+                        if st.session_state[slider_key] > 0:
+                            st.session_state[slider_key] -= 1
+                            st.rerun()
+
+                with col_nav3:
+                    # Range slider
+                    range_position = st.slider(
+                        "Navigate through data:",
+                        min_value=0,
+                        max_value=max(0, total_ranges - 1),
+                        value=st.session_state[slider_key],
+                        help=f"Slide to navigate through {total_records:,} total records",
+                        key=f"slider_control_{selected_symbol}"
+                    )
+
+                    if range_position != st.session_state[slider_key]:
+                        st.session_state[slider_key] = range_position
+                        st.rerun()
+
+                with col_nav4:
+                    if st.button("➡️ Next", help="Go to next range"):
+                        if st.session_state[slider_key] < total_ranges - 1:
+                            st.session_state[slider_key] += 1
+                            st.rerun()
+
+                with col_nav5:
+                    if st.button("⏭️ Last", help="Go to last range"):
+                        st.session_state[slider_key] = max(0, total_ranges - 1)
+                        st.rerun()
+
+                # Progress indicator
+                progress = (st.session_state[slider_key] + 1) / total_ranges if total_ranges > 0 else 0
+                st.progress(progress)
+                st.caption(f"Range {st.session_state[slider_key] + 1} of {total_ranges} • Progress: {progress:.1%}")
+
+                # Get chart data for current range
+                chart_data = df.iloc[current_start:current_end].copy()
+
+            elif data_points == "All":
+                if len(df) > 50000:
+                    st.warning(f"⚠️ Dataset has {len(df):,} records. Consider using 'Range Slider' for better performance.")
+                    st.info("💡 Large datasets may cause performance issues. The Range Slider option shows 15,000 points at a time with smooth navigation.")
                 chart_data = df
             else:
                 chart_data = df.tail(data_points)
