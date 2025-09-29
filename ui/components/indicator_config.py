@@ -41,6 +41,67 @@ class IndicatorConfigManager:
         defaults = get_indicator_defaults()
         return defaults.get(indicator_name, {})
 
+    def get_current_config_from_session(self, indicator_name: str, key_prefix: str) -> Dict[str, Any]:
+        """
+        Extract current configuration from session state without rendering UI.
+
+        Args:
+            indicator_name: Name of the indicator
+            key_prefix: Prefix for session state keys
+
+        Returns:
+            Dictionary with current configuration from session state
+        """
+        import streamlit as st
+
+        if indicator_name == 'Pivot Points':
+            return self._extract_pivot_points_config_from_session(key_prefix)
+
+        return self.get_default_config(indicator_name)
+
+    def _extract_pivot_points_config_from_session(self, key_prefix: str) -> Dict[str, Any]:
+        """Extract Pivot Points configuration from session state."""
+        import streamlit as st
+        from datetime import time
+
+        config = {}
+        defaults = self.get_default_config('Pivot Points')
+
+        # Time settings
+        start_time_key = f"{key_prefix}_pivot_start_time"
+        end_time_key = f"{key_prefix}_pivot_end_time"
+
+        if start_time_key in st.session_state:
+            start_time = st.session_state[start_time_key]
+            config['start_time'] = start_time.strftime('%H:%M') if hasattr(start_time, 'strftime') else str(start_time)
+        else:
+            config['start_time'] = defaults['start_time']
+
+        if end_time_key in st.session_state:
+            end_time = st.session_state[end_time_key]
+            config['end_time'] = end_time.strftime('%H:%M') if hasattr(end_time, 'strftime') else str(end_time)
+        else:
+            config['end_time'] = defaults['end_time']
+
+        # Color settings
+        pivot_color_key = f"{key_prefix}_pivot_color"
+        support_color_key = f"{key_prefix}_support_color"
+        resistance_color_key = f"{key_prefix}_resistance_color"
+
+        config['colors'] = {
+            'pivot': st.session_state.get(pivot_color_key, defaults['colors']['pivot']),
+            'support': st.session_state.get(support_color_key, defaults['colors']['support']),
+            'resistance': st.session_state.get(resistance_color_key, defaults['colors']['resistance'])
+        }
+
+        # Level selection
+        config['show_levels'] = {}
+        for level in ['P', 'S1', 'S2', 'S3', 'S4', 'S5', 'R1', 'R2', 'R3', 'R4', 'R5']:
+            level_key = f"{key_prefix}_show_{level}"
+            config['show_levels'][level] = st.session_state.get(level_key, defaults['show_levels'][level])
+
+        return config
+
     def create_indicator_config_ui(self, indicator_name: str, key_prefix: str = "") -> Dict[str, Any]:
         """
         Create UI controls for indicator configuration.

@@ -102,7 +102,69 @@ def show_data_preview():
             available_indicators = indicator_manager.get_available_indicators()
 
             if available_indicators:
-                active_indicators = []
+                # Initialize applied indicators state if not exists
+                applied_indicators_key = f"applied_indicators_{selected_symbol}"
+                if applied_indicators_key not in st.session_state:
+                    st.session_state[applied_indicators_key] = {}
+
+                # Check if any settings are being configured
+                has_open_settings = False
+                for indicator_name in available_indicators:
+                    session_key = f"settings_visible_{selected_symbol}_{indicator_name.replace(' ', '_')}"
+                    if st.session_state.get(session_key, False):
+                        has_open_settings = True
+                        break
+
+                # Save & Apply button - only show if settings are open
+                if has_open_settings:
+                    st.markdown("---")
+                    col_save1, col_save2, col_save3 = st.columns([2, 2, 6])
+
+                    with col_save1:
+                        if st.button("💾 **Save & Apply**", type="primary", help="Apply current indicator settings to chart"):
+                            # Apply all current settings
+                            for indicator_name in available_indicators:
+                                enabled_key = f"indicator_enabled_{selected_symbol}_{indicator_name.replace(' ', '_')}"
+                                settings_key = f"settings_visible_{selected_symbol}_{indicator_name.replace(' ', '_')}"
+
+                                is_enabled = st.session_state.get(enabled_key, False)
+
+                                if is_enabled:
+                                    # Get current configuration
+                                    if st.session_state.get(settings_key, False):
+                                        # Settings panel is open, create config from UI (but don't render UI)
+                                        config = indicator_manager.get_current_config_from_session(
+                                            indicator_name,
+                                            f"{selected_symbol}_{indicator_name.replace(' ', '_')}"
+                                        )
+                                    else:
+                                        config = indicator_manager.get_default_config(indicator_name)
+
+                                    st.session_state[applied_indicators_key][indicator_name] = {
+                                        'enabled': True,
+                                        'config': config
+                                    }
+                                else:
+                                    # Remove from applied if disabled
+                                    if indicator_name in st.session_state[applied_indicators_key]:
+                                        del st.session_state[applied_indicators_key][indicator_name]
+
+                            # Close all settings panels
+                            for indicator_name in available_indicators:
+                                settings_key = f"settings_visible_{selected_symbol}_{indicator_name.replace(' ', '_')}"
+                                st.session_state[settings_key] = False
+
+                            st.rerun()
+
+                    with col_save2:
+                        if st.button("❌ Cancel", help="Cancel changes and close settings"):
+                            # Close all settings panels without applying
+                            for indicator_name in available_indicators:
+                                settings_key = f"settings_visible_{selected_symbol}_{indicator_name.replace(' ', '_')}"
+                                st.session_state[settings_key] = False
+                            st.rerun()
+
+                    st.markdown("---")
 
                 for indicator_name in available_indicators:
                     # Create container with border for each indicator
@@ -119,12 +181,6 @@ def show_data_preview():
                                 help=f"Enable/disable {indicator_name}"
                             )
 
-                            # Reset settings panel state when indicator is toggled off
-                            if not is_enabled:
-                                session_key = f"settings_visible_{selected_symbol}_{indicator_name.replace(' ', '_')}"
-                                if session_key in st.session_state:
-                                    st.session_state[session_key] = False
-
                         with col2:
                             # Settings gear icon (always visible)
                             settings_key = f"show_settings_{selected_symbol}_{indicator_name.replace(' ', '_')}"
@@ -140,31 +196,35 @@ def show_data_preview():
                                 st.session_state[session_key] = not st.session_state.get(session_key, False)
 
                         with col3:
-                            # Indicator name
-                            st.write(f"**{indicator_name}**")
+                            # Indicator name with applied status
+                            applied_status = ""
+                            if indicator_name in st.session_state[applied_indicators_key]:
+                                applied_status = " ✅"
+                            st.write(f"**{indicator_name}**{applied_status}")
 
                         # Show settings panel if expanded
                         session_key = f"settings_visible_{selected_symbol}_{indicator_name.replace(' ', '_')}"
                         if st.session_state.get(session_key, False):
                             with st.container():
                                 st.markdown("---")
+                                st.info("⚠️ Configure settings above, then click **Save & Apply** to update the chart.")
                                 config = indicator_manager.create_indicator_config_ui(
                                     indicator_name,
                                     f"{selected_symbol}_{indicator_name.replace(' ', '_')}"
                                 )
                                 st.markdown("---")
-                        else:
-                            config = indicator_manager.get_default_config(indicator_name)
 
-                        # Create indicator instance if enabled
-                        if is_enabled:
-                            try:
-                                indicator = indicator_manager.create_indicator(indicator_name, config)
-                                active_indicators.append(indicator)
-                            except Exception as e:
-                                st.error(f"Error creating {indicator_name}: {str(e)}")
+                # Prepare active indicators from applied settings (not draft settings)
+                active_indicators = []
+                for indicator_name, indicator_data in st.session_state[applied_indicators_key].items():
+                    if indicator_data['enabled']:
+                        try:
+                            indicator = indicator_manager.create_indicator(indicator_name, indicator_data['config'])
+                            active_indicators.append(indicator)
+                        except Exception as e:
+                            st.error(f"Error creating {indicator_name}: {str(e)}")
 
-                # Store indicators in session state for reuse
+                # Store applied indicators in session state
                 indicators_key = f"active_indicators_{selected_symbol}"
                 st.session_state[indicators_key] = active_indicators
             else:
@@ -275,16 +335,12 @@ def show_data_preview():
                         st.warning(f"Could not calculate {indicator.name}: {str(e)}")
 
             # Create and display interactive chart with indicators
-            # Using a placeholder for smooth updates
-            chart_placeholder = st.empty()
-
-            with chart_placeholder.container():
-                fig, config = create_interactive_candlestick_chart(
-                    chart_data,
-                    selected_symbol,
-                    indicators=calculated_indicators
-                )
-                st.plotly_chart(fig, width='stretch', config=config, key=f"chart_{selected_symbol}_{hash(str(calculated_indicators))}")
+            fig, config = create_interactive_candlestick_chart(
+                chart_data,
+                selected_symbol,
+                indicators=calculated_indicators
+            )
+            st.plotly_chart(fig, width='stretch', config=config)
 
             # Display indicator information if any are active
             if calculated_indicators:
