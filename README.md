@@ -1,33 +1,48 @@
 # Cross-Market Backtest Application
 
-A Python application for cross-market backtesting with market data from multiple exchanges and asset types (TradFi and Crypto).
+A Python application for cross-market backtesting with market data from multiple exchanges and asset types (TradFi and Crypto). Features an intuitive web interface with advanced charting and technical indicator overlays.
 
 ## Features
 
 - 🗄️ **Database Integration**: Connects to PostgreSQL with SSL certificate authentication
 - 📊 **Multi-Asset Support**: Handles both traditional finance and cryptocurrency data
 - 🎯 **Symbol Management**: Easy configuration of which symbols to include/exclude from analysis
-- 🖥️ **Web UI**: Interactive Streamlit interface for symbol management and data visualization
-- 📈 **Data Visualization**: Candlestick charts and data previews
-- 🔧 **Modular Architecture**: Clean, maintainable code structure
+- 🖥️ **Interactive Web UI**: Modern Streamlit interface with tabbed navigation
+- 📈 **Advanced Charting**: Interactive candlestick charts with zoom, pan, and range navigation
+- 🔧 **Technical Indicators**: Configurable indicators with real-time overlays (Pivot Points, etc.)
+- 🎨 **Customizable Settings**: Color themes, time ranges, and display options for indicators
+- 📊 **Data Range Navigation**: Efficient handling of large datasets with slider controls
+- 🏗️ **Modular Architecture**: Clean, extensible code structure with component-based UI
 
 ## Project Structure
 
 ```
 cross-market-backtest/
-├── src/                    # Core application modules
-│   ├── database.py         # Database connection and SSL handling
-│   └── data_fetcher.py     # Market data fetching functions
-├── ui/                     # Streamlit web interface
-│   └── app.py             # Main UI application
-├── certs/                  # SSL certificates
+├── src/                      # Core application modules
+│   ├── database.py           # Database connection and SSL handling
+│   ├── data_fetcher.py       # Market data fetching functions
+│   └── indicators/           # Technical indicator implementations
+│       ├── __init__.py       # Indicator exports
+│       ├── base.py           # Base indicator interface
+│       └── pivot_points.py   # Pivot Points indicator
+├── ui/                       # Streamlit web interface
+│   ├── app.py               # Main UI application with tabs
+│   └── components/          # Modular UI components
+│       ├── analysis_section.py     # Analysis tab functionality
+│       ├── chart_utils.py          # Interactive chart utilities
+│       ├── data_loader.py          # Data loading components
+│       ├── data_preview.py         # Data preview with charts/indicators
+│       ├── indicator_config.py     # Indicator configuration UI
+│       ├── indicator_defaults.py   # Default indicator settings
+│       └── symbol_management.py    # Symbol management interface
+├── certs/                   # SSL certificates
 │   └── ca-certificate.crt
-├── config.py              # Environment configuration
-├── symbols_config.py      # Symbol management configuration
-├── main.py               # CLI data fetching script
-├── run_ui.py             # UI launcher script
-├── requirements.txt      # Python dependencies
-└── .env                  # Environment variables (create this)
+├── config.py               # Environment configuration
+├── symbols_config.py       # Symbol management configuration
+├── main.py                # CLI data fetching script
+├── run_ui.py              # UI launcher script
+├── requirements.txt       # Python dependencies
+└── .env                   # Environment variables (create this)
 ```
 
 ## Setup Instructions
@@ -103,14 +118,24 @@ The UI will be available at http://localhost:8501
    - View used/ignored symbol lists
    - Move symbols between lists with buttons
    - Bulk operations (use all, ignore all)
+   - Real-time symbol status updates
 
 2. **Data Preview Tab**:
-   - Select symbols to preview
-   - View data statistics and samples
-   - Interactive candlestick charts
+   - Symbol selection and data loading
+   - Comprehensive data statistics and samples
+   - **Interactive Charts**:
+     - Zoom, pan, and double-click reset
+     - Range slider navigation for large datasets (15k points optimized view)
+     - Mouse controls with performance indicators
+   - **Technical Indicators**:
+     - Toggle-based indicator activation
+     - Expandable settings with gear icon controls
+     - Live indicator overlays on charts
+     - Configurable colors, time ranges, and display levels
+     - Currently supports: Pivot Points (with S1-S5, R1-R5 levels)
 
 3. **Analysis Tab**:
-   - Foundation for future analysis features
+   - Foundation for future backtesting and strategy features
 
 ## Available Symbols
 
@@ -157,9 +182,51 @@ Symbol metadata includes:
 ### Adding New Features
 
 1. **Database Functions**: Add to `src/database.py` or `src/data_fetcher.py`
-2. **UI Components**: Add to `ui/app.py` or create new UI modules
-3. **Configuration**: Update `symbols_config.py` for symbol management
-4. **Dependencies**: Add to `requirements.txt`
+2. **UI Components**: Create new modules in `ui/components/` following existing patterns
+3. **Technical Indicators**:
+   - Create new indicator class in `src/indicators/` extending `BaseIndicator`
+   - Add default settings to `ui/components/indicator_defaults.py`
+   - Register in `ui/components/indicator_config.py`
+4. **Configuration**: Update `symbols_config.py` for symbol management
+5. **Dependencies**: Add to `requirements.txt`
+
+### Technical Indicator Development
+
+To add a new technical indicator:
+
+1. **Create Indicator Class** (`src/indicators/your_indicator.py`):
+   ```python
+   from .base import BaseIndicator
+
+   class YourIndicator(BaseIndicator):
+       def __init__(self, config=None):
+           super().__init__("Your Indicator", config)
+
+       def calculate(self, data):
+           # Implementation
+           pass
+
+       def get_plot_data(self):
+           # Return plot configuration
+           pass
+   ```
+
+2. **Add Default Settings** (`ui/components/indicator_defaults.py`):
+   ```python
+   'Your Indicator': {
+       'enabled': False,
+       'parameter1': 'default_value',
+       # ... other defaults
+   }
+   ```
+
+3. **Register Indicator** (`ui/components/indicator_config.py`):
+   ```python
+   self.available_indicators = {
+       'Your Indicator': YourIndicator,
+       # ... existing indicators
+   }
+   ```
 
 ### Code Style
 
@@ -190,14 +257,31 @@ If you get "Module not found" errors:
 
 ## Future Enhancements
 
+### Core Functionality
 - [ ] Backtesting engine implementation
 - [ ] Strategy configuration interface
 - [ ] Performance metrics and reporting
 - [ ] Multi-timeframe analysis
 - [ ] Portfolio optimization features
 - [ ] Risk management tools
+
+### Technical Indicators
+- [ ] Moving Averages (SMA, EMA, WMA)
+- [ ] RSI (Relative Strength Index)
+- [ ] MACD (Moving Average Convergence Divergence)
+- [ ] Bollinger Bands
+- [ ] Fibonacci Retracements
+- [ ] Support/Resistance levels
+- [ ] Volume indicators
+
+### UI/UX Improvements
 - [ ] Export functionality (CSV, Excel)
-- [ ] Advanced charting features
+- [ ] Chart annotations and drawing tools
+- [ ] Multiple chart layouts
+- [ ] Dark/light theme toggle
+- [ ] Chart templates and presets
+- [ ] Real-time data streaming
+- [ ] Advanced filtering and search
 
 ## License
 
