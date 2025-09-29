@@ -192,41 +192,262 @@ Symbol metadata includes:
 
 ### Technical Indicator Development
 
-To add a new technical indicator:
+To add a new technical indicator, follow these comprehensive steps:
 
-1. **Create Indicator Class** (`src/indicators/your_indicator.py`):
-   ```python
-   from .base import BaseIndicator
+#### Step 1: Create Indicator Class (`src/indicators/your_indicator.py`)
+```python
+"""
+Your Indicator description.
+Brief explanation of what this indicator does.
+"""
 
-   class YourIndicator(BaseIndicator):
-       def __init__(self, config=None):
-           super().__init__("Your Indicator", config)
+import pandas as pd
+import numpy as np
+from typing import Dict, Any, List
+from .base import BaseIndicator
 
-       def calculate(self, data):
-           # Implementation
-           pass
 
-       def get_plot_data(self):
-           # Return plot configuration
-           pass
-   ```
+class YourIndicator(BaseIndicator):
+    """
+    Your Indicator class with detailed description.
 
-2. **Add Default Settings** (`ui/components/indicator_defaults.py`):
-   ```python
-   'Your Indicator': {
-       'enabled': False,
-       'parameter1': 'default_value',
-       # ... other defaults
-   }
-   ```
+    Explain parameters, calculations, and usage.
+    """
 
-3. **Register Indicator** (`ui/components/indicator_config.py`):
-   ```python
-   self.available_indicators = {
-       'Your Indicator': YourIndicator,
-       # ... existing indicators
-   }
-   ```
+    def __init__(self, config: Dict[str, Any] = None):
+        super().__init__("Your Indicator", config)
+
+        # Extract configuration parameters
+        self.parameter1 = self.config.get('parameter1', default_value)
+        self.parameter2 = self.config.get('parameter2', default_value)
+        # ... other parameters
+
+    def calculate(self, data: pd.DataFrame) -> pd.DataFrame:
+        """
+        Calculate indicator values.
+
+        Args:
+            data: DataFrame with OHLC data
+
+        Returns:
+            DataFrame with calculated indicator values
+        """
+        if not self.validate_data(data):
+            raise ValueError("Invalid data format for Your Indicator")
+
+        self.data = data.copy()
+
+        # Perform calculations
+        # self.data['indicator_value'] = your_calculation_logic
+
+        self.calculated = True
+        return self.data
+
+    def get_plot_data(self) -> Dict[str, Any]:
+        """
+        Get data formatted for plotting.
+
+        Returns:
+            Dictionary with plot configuration and data
+        """
+        if not self.calculated or self.data is None:
+            return {'traces': [], 'layout_updates': {}}
+
+        traces = []
+
+        # Add your plot traces
+        traces.append({
+            'type': 'scatter',
+            'x': self.data['timestamp'],
+            'y': self.data['indicator_value'],
+            'mode': 'lines',
+            'name': 'Your Indicator Line',
+            'line': {'color': '#00FF00', 'width': 2},
+            'showlegend': True,
+            'hovertemplate': 'Value: %{y:.4f}<br>%{x}<extra></extra>'
+        })
+
+        return {
+            'traces': traces,
+            'layout_updates': {}
+        }
+```
+
+#### Step 2: Add to Indicators Package (`src/indicators/__init__.py`)
+```python
+from .base import BaseIndicator
+from .pivot_points import PivotPoints
+from .hts import HTS
+from .your_indicator import YourIndicator  # Add your import
+
+__all__ = ['BaseIndicator', 'PivotPoints', 'HTS', 'YourIndicator']  # Add to exports
+```
+
+#### Step 3: Add Default Settings (`ui/components/indicator_defaults.py`)
+
+Add to the `get_indicator_defaults()` function:
+```python
+'Your Indicator': {
+    'enabled': False,
+    'parameter1': default_value1,
+    'parameter2': default_value2,
+    'colors': {
+        'line1': '#00FF00',
+        'line2': '#FF0000'
+    },
+    'show_options': {
+        'option1': True,
+        'option2': False
+    }
+}
+```
+
+Add to the `get_indicator_ui_config()` function:
+```python
+'Your Indicator': {
+    'sections': [
+        {
+            'title': '⚙️ Basic Settings',
+            'type': 'basic_group',
+            'fields': [
+                {
+                    'key': 'parameter1',
+                    'label': 'Parameter 1',
+                    'type': 'number',
+                    'default': default_value1,
+                    'min': min_value,
+                    'max': max_value,
+                    'help': 'Description of parameter 1'
+                }
+            ]
+        },
+        {
+            'title': '🎨 Display Settings',
+            'type': 'display_group',
+            'fields': [
+                {
+                    'key': 'colors.line1',
+                    'label': 'Line 1 Color',
+                    'type': 'color_picker',
+                    'default': '#00FF00',
+                    'help': 'Color for line 1'
+                }
+            ]
+        }
+    ]
+}
+```
+
+#### Step 4: Register in Configuration Manager (`ui/components/indicator_config.py`)
+
+**4a. Add Import:**
+```python
+from src.indicators import PivotPoints, HTS, YourIndicator  # Add your import
+```
+
+**4b. Register in Available Indicators:**
+```python
+def __init__(self):
+    self.available_indicators = {
+        'Pivot Points': PivotPoints,
+        'HTS': HTS,
+        'Your Indicator': YourIndicator  # Add your indicator
+    }
+```
+
+**4c. Add Session State Extraction Method:**
+```python
+def get_current_config_from_session(self, indicator_name: str, key_prefix: str) -> Dict[str, Any]:
+    # ... existing conditions
+    elif indicator_name == 'Your Indicator':
+        return self._extract_your_indicator_config_from_session(key_prefix)
+
+    return self.get_default_config(indicator_name)
+
+def _extract_your_indicator_config_from_session(self, key_prefix: str) -> Dict[str, Any]:
+    """Extract Your Indicator configuration from session state."""
+    import streamlit as st
+
+    config = {}
+    defaults = self.get_default_config('Your Indicator')
+
+    # Extract all parameters from session state
+    config['parameter1'] = st.session_state.get(f"{key_prefix}_parameter1", defaults['parameter1'])
+    config['parameter2'] = st.session_state.get(f"{key_prefix}_parameter2", defaults['parameter2'])
+
+    # Extract colors
+    config['colors'] = {
+        'line1': st.session_state.get(f"{key_prefix}_line1_color", defaults['colors']['line1'])
+    }
+
+    return config
+```
+
+**4d. Add UI Creation Method:**
+```python
+def create_indicator_config_ui(self, indicator_name: str, key_prefix: str = "") -> Dict[str, Any]:
+    # ... existing conditions
+    elif indicator_name == 'Your Indicator':
+        return self._create_your_indicator_config(key_prefix)
+
+def _create_your_indicator_config(self, key_prefix: str) -> Dict[str, Any]:
+    """Create configuration UI for Your Indicator."""
+    config = {}
+    defaults = self.get_default_config('Your Indicator')
+
+    st.subheader("⚙️ Your Indicator Configuration")
+
+    # Create UI controls
+    parameter1 = st.number_input(
+        "Parameter 1",
+        min_value=min_value,
+        max_value=max_value,
+        value=defaults['parameter1'],
+        help="Description of parameter 1",
+        key=f"{key_prefix}_parameter1"
+    )
+
+    line1_color = st.color_picker(
+        "Line 1 Color",
+        value=defaults['colors']['line1'],
+        key=f"{key_prefix}_line1_color"
+    )
+
+    config = {
+        'parameter1': parameter1,
+        'colors': {
+            'line1': line1_color
+        }
+    }
+
+    return config
+```
+
+#### Complete Example: HTS Indicator
+
+See `src/indicators/hts.py` and related configuration files for a complete working example of a dual EMA channel indicator with:
+- Multiple configurable periods (EMA33, EMA144)
+- Configurable data sources (high, low, close, open)
+- Multiple colors and visibility toggles
+- Complex plotting with solid/dotted line styles
+
+#### File Checklist
+
+When adding a new indicator, ensure you update these files:
+- ✅ `src/indicators/your_indicator.py` - Main indicator class
+- ✅ `src/indicators/__init__.py` - Add import and export
+- ✅ `ui/components/indicator_defaults.py` - Add defaults and UI config
+- ✅ `ui/components/indicator_config.py` - Add import, registration, session extraction, and UI creation methods
+
+#### Testing Your Indicator
+
+1. Start the application: `python run_ui.py`
+2. Go to Data Preview tab
+3. Load symbol data
+4. Scroll to Technical Indicators Configuration
+5. Toggle your indicator ON - should show with defaults
+6. Click gear icon to configure settings
+7. Verify Save & Apply workflow works correctly
 
 ### Code Style
 
