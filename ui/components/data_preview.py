@@ -257,9 +257,10 @@ def show_data_preview():
                         with col1:
                             # Toggle switch for enabling/disabling indicator
                             is_enabled = st.toggle(
-                                "",
+                                "Enable",
                                 key=enabled_key,
-                                help=f"Enable/disable {indicator_name}"
+                                help=f"Enable/disable {indicator_name}",
+                                label_visibility="collapsed"
                             )
 
                             # If toggle changed to enabled, apply default settings immediately
