@@ -12,7 +12,7 @@ from datetime import time
 # Add parent directory to path to import our modules
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-from src.indicators import PivotPoints
+from src.indicators import PivotPoints, HTS
 from .indicator_defaults import get_indicator_defaults, get_indicator_ui_config, DEFAULT_COLORS
 
 
@@ -21,7 +21,8 @@ class IndicatorConfigManager:
 
     def __init__(self):
         self.available_indicators = {
-            'Pivot Points': PivotPoints
+            'Pivot Points': PivotPoints,
+            'HTS': HTS
         }
 
     def get_available_indicators(self) -> List[str]:
@@ -56,6 +57,8 @@ class IndicatorConfigManager:
 
         if indicator_name == 'Pivot Points':
             return self._extract_pivot_points_config_from_session(key_prefix)
+        elif indicator_name == 'HTS':
+            return self._extract_hts_config_from_session(key_prefix)
 
         return self.get_default_config(indicator_name)
 
@@ -102,6 +105,37 @@ class IndicatorConfigManager:
 
         return config
 
+    def _extract_hts_config_from_session(self, key_prefix: str) -> Dict[str, Any]:
+        """Extract HTS configuration from session state."""
+        import streamlit as st
+
+        config = {}
+        defaults = self.get_default_config('HTS')
+
+        # Period settings
+        config['channel1_period'] = st.session_state.get(f"{key_prefix}_channel1_period", defaults['channel1_period'])
+        config['channel2_period'] = st.session_state.get(f"{key_prefix}_channel2_period", defaults['channel2_period'])
+
+        # Source settings
+        config['channel1_source_high'] = st.session_state.get(f"{key_prefix}_channel1_source_high", defaults['channel1_source_high'])
+        config['channel1_source_low'] = st.session_state.get(f"{key_prefix}_channel1_source_low", defaults['channel1_source_low'])
+        config['channel2_source_high'] = st.session_state.get(f"{key_prefix}_channel2_source_high", defaults['channel2_source_high'])
+        config['channel2_source_low'] = st.session_state.get(f"{key_prefix}_channel2_source_low", defaults['channel2_source_low'])
+
+        # Color settings
+        config['colors'] = {
+            'channel1': st.session_state.get(f"{key_prefix}_channel1_color", defaults['colors']['channel1']),
+            'channel2': st.session_state.get(f"{key_prefix}_channel2_color", defaults['colors']['channel2'])
+        }
+
+        # Visibility settings
+        config['show_channels'] = {
+            'channel1': st.session_state.get(f"{key_prefix}_show_channel1", defaults['show_channels']['channel1']),
+            'channel2': st.session_state.get(f"{key_prefix}_show_channel2", defaults['show_channels']['channel2'])
+        }
+
+        return config
+
     def create_indicator_config_ui(self, indicator_name: str, key_prefix: str = "") -> Dict[str, Any]:
         """
         Create UI controls for indicator configuration.
@@ -121,6 +155,8 @@ class IndicatorConfigManager:
 
         if indicator_name == 'Pivot Points':
             return self._create_pivot_points_config(key_prefix)
+        elif indicator_name == 'HTS':
+            return self._create_hts_config(key_prefix)
 
         return {}
 
@@ -220,6 +256,132 @@ class IndicatorConfigManager:
             'P': show_pivot,
             'S1': show_s1, 'S2': show_s2, 'S3': show_s3, 'S4': show_s4, 'S5': show_s5,
             'R1': show_r1, 'R2': show_r2, 'R3': show_r3, 'R4': show_r4, 'R5': show_r5
+        }
+
+        return config
+
+    def _create_hts_config(self, key_prefix: str) -> Dict[str, Any]:
+        """Create configuration UI for HTS indicator."""
+        config = {}
+        defaults = self.get_default_config('HTS')
+
+        st.subheader("⚙️ HTS Configuration")
+
+        # Channel 1 Settings
+        st.markdown("**📈 Channel 1 Settings (EMA33)**")
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+            channel1_period = st.number_input(
+                "Channel 1 Period",
+                min_value=2,
+                max_value=200,
+                value=defaults['channel1_period'],
+                help="Period for Channel 1 EMA calculation",
+                key=f"{key_prefix}_channel1_period"
+            )
+
+        with col2:
+            channel1_source_high = st.selectbox(
+                "High Line Source",
+                options=['high', 'close', 'open'],
+                index=['high', 'close', 'open'].index(defaults['channel1_source_high']),
+                help="Data source for Channel 1 high line",
+                key=f"{key_prefix}_channel1_source_high"
+            )
+
+        with col3:
+            channel1_source_low = st.selectbox(
+                "Low Line Source",
+                options=['low', 'close', 'open'],
+                index=['low', 'close', 'open'].index(defaults['channel1_source_low']),
+                help="Data source for Channel 1 low line",
+                key=f"{key_prefix}_channel1_source_low"
+            )
+
+        # Channel 2 Settings
+        st.markdown("**📊 Channel 2 Settings (EMA144)**")
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+            channel2_period = st.number_input(
+                "Channel 2 Period",
+                min_value=2,
+                max_value=500,
+                value=defaults['channel2_period'],
+                help="Period for Channel 2 EMA calculation",
+                key=f"{key_prefix}_channel2_period"
+            )
+
+        with col2:
+            channel2_source_high = st.selectbox(
+                "High Line Source",
+                options=['high', 'close', 'open'],
+                index=['high', 'close', 'open'].index(defaults['channel2_source_high']),
+                help="Data source for Channel 2 high line",
+                key=f"{key_prefix}_channel2_source_high"
+            )
+
+        with col3:
+            channel2_source_low = st.selectbox(
+                "Low Line Source",
+                options=['low', 'close', 'open'],
+                index=['low', 'close', 'open'].index(defaults['channel2_source_low']),
+                help="Data source for Channel 2 low line",
+                key=f"{key_prefix}_channel2_source_low"
+            )
+
+        # Colors and Visibility
+        st.markdown("**🎨 Colors & Visibility**")
+        col1, col2 = st.columns(2)
+
+        with col1:
+            st.markdown("*Colors:*")
+            channel1_color = st.color_picker(
+                "Channel 1 Color",
+                value=defaults['colors']['channel1'],
+                help="Color for Channel 1 (EMA33) lines",
+                key=f"{key_prefix}_channel1_color"
+            )
+
+            channel2_color = st.color_picker(
+                "Channel 2 Color",
+                value=defaults['colors']['channel2'],
+                help="Color for Channel 2 (EMA144) lines",
+                key=f"{key_prefix}_channel2_color"
+            )
+
+        with col2:
+            st.markdown("*Visibility:*")
+            show_channel1 = st.checkbox(
+                "Show Channel 1",
+                value=defaults['show_channels']['channel1'],
+                help="Display Channel 1 (EMA33) lines",
+                key=f"{key_prefix}_show_channel1"
+            )
+
+            show_channel2 = st.checkbox(
+                "Show Channel 2",
+                value=defaults['show_channels']['channel2'],
+                help="Display Channel 2 (EMA144) lines",
+                key=f"{key_prefix}_show_channel2"
+            )
+
+        config = {
+            'channel1_period': channel1_period,
+            'channel2_period': channel2_period,
+            'channel1_source_high': channel1_source_high,
+            'channel1_source_low': channel1_source_low,
+            'channel2_source_high': channel2_source_high,
+            'channel2_source_low': channel2_source_low,
+            'colors': {
+                'channel1': channel1_color,
+                'channel2': channel2_color
+            },
+            'show_channels': {
+                'channel1': show_channel1,
+                'channel2': show_channel2
+            }
         }
 
         return config
