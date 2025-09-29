@@ -83,84 +83,6 @@ def show_data_preview():
             st.subheader("📋 Data Sample")
             st.dataframe(df.head(20), width='stretch')
 
-            # Interactive price chart
-            st.subheader("📈 Interactive Price Chart")
-
-            # Indicators section
-            with st.expander("🔧 Technical Indicators", expanded=False):
-                indicator_manager = IndicatorConfigManager()
-                available_indicators = indicator_manager.get_available_indicators()
-
-                if available_indicators:
-                    active_indicators = []
-
-                    st.markdown("### Available Indicators")
-
-                    for indicator_name in available_indicators:
-                        # Create container with border for each indicator
-                        with st.container(border=True):
-                            # Create columns for toggle, name, and gear icon
-                            col1, col2, col3 = st.columns([1, 4, 1])
-
-                            with col1:
-                                # Toggle switch for enabling/disabling indicator
-                                enabled_key = f"indicator_enabled_{selected_symbol}_{indicator_name.replace(' ', '_')}"
-                                is_enabled = st.toggle(
-                                    "",
-                                    key=enabled_key,
-                                    help=f"Enable/disable {indicator_name}"
-                                )
-
-                            with col2:
-                                # Indicator name
-                                st.write(f"**{indicator_name}**")
-
-                            with col3:
-                                # Settings gear icon (only show if enabled)
-                                if is_enabled:
-                                    settings_key = f"show_settings_{selected_symbol}_{indicator_name.replace(' ', '_')}"
-                                    show_settings = st.button(
-                                        "⚙️",
-                                        key=settings_key,
-                                        help=f"Configure {indicator_name} settings"
-                                    )
-
-                                    # Store settings visibility state
-                                    if show_settings:
-                                        session_key = f"settings_visible_{selected_symbol}_{indicator_name.replace(' ', '_')}"
-                                        st.session_state[session_key] = not st.session_state.get(session_key, False)
-
-                            # Create indicator instance if enabled
-                            if is_enabled:
-                                session_key = f"settings_visible_{selected_symbol}_{indicator_name.replace(' ', '_')}"
-
-                                # Show settings panel if expanded
-                                if st.session_state.get(session_key, False):
-                                    with st.container():
-                                        st.markdown("---")
-                                        config = indicator_manager.create_indicator_config_ui(
-                                            indicator_name,
-                                            f"{selected_symbol}_{indicator_name.replace(' ', '_')}"
-                                        )
-                                        st.markdown("---")
-                                else:
-                                    # Use default config if settings not visible
-                                    config = indicator_manager.get_default_config(indicator_name)
-
-                                # Create indicator instance
-                                try:
-                                    indicator = indicator_manager.create_indicator(indicator_name, config)
-                                    active_indicators.append(indicator)
-                                except Exception as e:
-                                    st.error(f"Error creating {indicator_name}: {str(e)}")
-
-                    # Store indicators in session state for reuse
-                    indicators_key = f"active_indicators_{selected_symbol}"
-                    st.session_state[indicators_key] = active_indicators
-                else:
-                    st.info("No indicators available.")
-                    st.session_state[f"active_indicators_{selected_symbol}"] = []
-
             # Chart controls
             col1, col2 = st.columns([3, 1])
             with col1:
@@ -173,6 +95,84 @@ def show_data_preview():
                     help="Select number of recent data points to display or use Range Slider for large datasets",
                     key=f"data_points_{selected_symbol}"
                 )
+
+            # Indicators section - placed right before the chart
+            st.subheader("🔧 Technical Indicators")
+            indicator_manager = IndicatorConfigManager()
+            available_indicators = indicator_manager.get_available_indicators()
+
+            if available_indicators:
+                active_indicators = []
+
+                for indicator_name in available_indicators:
+                    # Create container with border for each indicator
+                    with st.container(border=True):
+                        # Create columns for toggle, gear icon (next to each other), and indicator name
+                        col1, col2, col3 = st.columns([1, 1, 8])
+
+                        with col1:
+                            # Toggle switch for enabling/disabling indicator
+                            enabled_key = f"indicator_enabled_{selected_symbol}_{indicator_name.replace(' ', '_')}"
+                            is_enabled = st.toggle(
+                                "",
+                                key=enabled_key,
+                                help=f"Enable/disable {indicator_name}"
+                            )
+
+                            # Reset settings panel state when indicator is toggled off
+                            if not is_enabled:
+                                session_key = f"settings_visible_{selected_symbol}_{indicator_name.replace(' ', '_')}"
+                                if session_key in st.session_state:
+                                    st.session_state[session_key] = False
+
+                        with col2:
+                            # Settings gear icon (always visible)
+                            settings_key = f"show_settings_{selected_symbol}_{indicator_name.replace(' ', '_')}"
+                            show_settings = st.button(
+                                "⚙️",
+                                key=settings_key,
+                                help=f"Configure {indicator_name} settings"
+                            )
+
+                            # Store settings visibility state
+                            if show_settings:
+                                session_key = f"settings_visible_{selected_symbol}_{indicator_name.replace(' ', '_')}"
+                                st.session_state[session_key] = not st.session_state.get(session_key, False)
+
+                        with col3:
+                            # Indicator name
+                            st.write(f"**{indicator_name}**")
+
+                        # Show settings panel if expanded
+                        session_key = f"settings_visible_{selected_symbol}_{indicator_name.replace(' ', '_')}"
+                        if st.session_state.get(session_key, False):
+                            with st.container():
+                                st.markdown("---")
+                                config = indicator_manager.create_indicator_config_ui(
+                                    indicator_name,
+                                    f"{selected_symbol}_{indicator_name.replace(' ', '_')}"
+                                )
+                                st.markdown("---")
+                        else:
+                            config = indicator_manager.get_default_config(indicator_name)
+
+                        # Create indicator instance if enabled
+                        if is_enabled:
+                            try:
+                                indicator = indicator_manager.create_indicator(indicator_name, config)
+                                active_indicators.append(indicator)
+                            except Exception as e:
+                                st.error(f"Error creating {indicator_name}: {str(e)}")
+
+                # Store indicators in session state for reuse
+                indicators_key = f"active_indicators_{selected_symbol}"
+                st.session_state[indicators_key] = active_indicators
+            else:
+                st.info("No indicators available.")
+                st.session_state[f"active_indicators_{selected_symbol}"] = []
+
+            # Interactive price chart
+            st.subheader("📈 Interactive Price Chart")
 
             # Prepare chart data based on selection
             if data_points == "Range Slider":
@@ -275,12 +275,16 @@ def show_data_preview():
                         st.warning(f"Could not calculate {indicator.name}: {str(e)}")
 
             # Create and display interactive chart with indicators
-            fig, config = create_interactive_candlestick_chart(
-                chart_data,
-                selected_symbol,
-                indicators=calculated_indicators
-            )
-            st.plotly_chart(fig, width='stretch', config=config)
+            # Using a placeholder for smooth updates
+            chart_placeholder = st.empty()
+
+            with chart_placeholder.container():
+                fig, config = create_interactive_candlestick_chart(
+                    chart_data,
+                    selected_symbol,
+                    indicators=calculated_indicators
+                )
+                st.plotly_chart(fig, width='stretch', config=config, key=f"chart_{selected_symbol}_{hash(str(calculated_indicators))}")
 
             # Display indicator information if any are active
             if calculated_indicators:
