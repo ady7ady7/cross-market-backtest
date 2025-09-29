@@ -92,33 +92,67 @@ def show_data_preview():
                 available_indicators = indicator_manager.get_available_indicators()
 
                 if available_indicators:
-                    use_indicators = st.checkbox(
-                        "Enable Indicators",
-                        key=f"use_indicators_{selected_symbol}",
-                        help="Add technical indicators to the chart"
-                    )
-
                     active_indicators = []
-                    if use_indicators:
-                        selected_indicators = st.multiselect(
-                            "Select Indicators:",
-                            available_indicators,
-                            key=f"selected_indicators_{selected_symbol}",
-                            help="Choose which indicators to display"
-                        )
 
-                        for indicator_name in selected_indicators:
-                            st.markdown(f"---")
-                            config = indicator_manager.create_indicator_config_ui(
-                                indicator_name,
-                                f"{selected_symbol}_{indicator_name}"
-                            )
+                    st.markdown("### Available Indicators")
 
-                            try:
-                                indicator = indicator_manager.create_indicator(indicator_name, config)
-                                active_indicators.append(indicator)
-                            except Exception as e:
-                                st.error(f"Error creating {indicator_name}: {str(e)}")
+                    for indicator_name in available_indicators:
+                        # Create container for each indicator
+                        with st.container():
+                            # Create columns for toggle, name, and gear icon
+                            col1, col2, col3 = st.columns([1, 4, 1])
+
+                            with col1:
+                                # Toggle switch for enabling/disabling indicator
+                                enabled_key = f"indicator_enabled_{selected_symbol}_{indicator_name.replace(' ', '_')}"
+                                is_enabled = st.checkbox(
+                                    "",
+                                    key=enabled_key,
+                                    help=f"Enable/disable {indicator_name}"
+                                )
+
+                            with col2:
+                                # Indicator name
+                                st.write(f"**{indicator_name}**")
+
+                            with col3:
+                                # Settings gear icon (only show if enabled)
+                                if is_enabled:
+                                    settings_key = f"show_settings_{selected_symbol}_{indicator_name.replace(' ', '_')}"
+                                    show_settings = st.button(
+                                        "⚙️",
+                                        key=settings_key,
+                                        help=f"Configure {indicator_name} settings"
+                                    )
+
+                                    # Store settings visibility state
+                                    if show_settings:
+                                        session_key = f"settings_visible_{selected_symbol}_{indicator_name.replace(' ', '_')}"
+                                        st.session_state[session_key] = not st.session_state.get(session_key, False)
+
+                            # Create indicator instance if enabled
+                            if is_enabled:
+                                session_key = f"settings_visible_{selected_symbol}_{indicator_name.replace(' ', '_')}"
+
+                                # Show settings panel if expanded
+                                if st.session_state.get(session_key, False):
+                                    with st.container():
+                                        st.markdown("---")
+                                        config = indicator_manager.create_indicator_config_ui(
+                                            indicator_name,
+                                            f"{selected_symbol}_{indicator_name.replace(' ', '_')}"
+                                        )
+                                        st.markdown("---")
+                                else:
+                                    # Use default config if settings not visible
+                                    config = indicator_manager.get_default_config(indicator_name)
+
+                                # Create indicator instance
+                                try:
+                                    indicator = indicator_manager.create_indicator(indicator_name, config)
+                                    active_indicators.append(indicator)
+                                except Exception as e:
+                                    st.error(f"Error creating {indicator_name}: {str(e)}")
 
                     # Store indicators in session state for reuse
                     indicators_key = f"active_indicators_{selected_symbol}"

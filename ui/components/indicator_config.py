@@ -13,6 +13,7 @@ from datetime import time
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from src.indicators import PivotPoints
+from .indicator_defaults import get_indicator_defaults, get_indicator_ui_config, DEFAULT_COLORS
 
 
 class IndicatorConfigManager:
@@ -26,6 +27,19 @@ class IndicatorConfigManager:
     def get_available_indicators(self) -> List[str]:
         """Get list of available indicator names."""
         return list(self.available_indicators.keys())
+
+    def get_default_config(self, indicator_name: str) -> Dict[str, Any]:
+        """
+        Get default configuration for an indicator.
+
+        Args:
+            indicator_name: Name of the indicator
+
+        Returns:
+            Dictionary with default configuration
+        """
+        defaults = get_indicator_defaults()
+        return defaults.get(indicator_name, {})
 
     def create_indicator_config_ui(self, indicator_name: str, key_prefix: str = "") -> Dict[str, Any]:
         """
@@ -52,6 +66,7 @@ class IndicatorConfigManager:
     def _create_pivot_points_config(self, key_prefix: str) -> Dict[str, Any]:
         """Create configuration UI for Pivot Points."""
         config = {}
+        defaults = self.get_default_config('Pivot Points')
 
         st.subheader("⚙️ Pivot Points Configuration")
 
@@ -82,24 +97,27 @@ class IndicatorConfigManager:
         with col1:
             pivot_color = st.selectbox(
                 "Pivot Point Color",
-                options=['#FFFFFF', '#FFFF00', '#FF00FF'],
-                format_func=lambda x: {'#FFFFFF': 'White', '#FFFF00': 'Yellow', '#FF00FF': 'Magenta'}[x],
+                options=DEFAULT_COLORS['pivot']['options'],
+                format_func=lambda x: DEFAULT_COLORS['pivot']['labels'][x],
+                index=DEFAULT_COLORS['pivot']['options'].index(defaults['colors']['pivot']),
                 key=f"{key_prefix}_pivot_color"
             )
 
         with col2:
             support_color = st.selectbox(
                 "Support Color",
-                options=['#FF0000', '#FF4500', '#DC143C'],
-                format_func=lambda x: {'#FF0000': 'Red', '#FF4500': 'Orange Red', '#DC143C': 'Crimson'}[x],
+                options=DEFAULT_COLORS['support']['options'],
+                format_func=lambda x: DEFAULT_COLORS['support']['labels'][x],
+                index=DEFAULT_COLORS['support']['options'].index(defaults['colors']['support']),
                 key=f"{key_prefix}_support_color"
             )
 
         with col3:
             resistance_color = st.selectbox(
                 "Resistance Color",
-                options=['#00FF00', '#32CD32', '#228B22'],
-                format_func=lambda x: {'#00FF00': 'Green', '#32CD32': 'Lime Green', '#228B22': 'Forest Green'}[x],
+                options=DEFAULT_COLORS['resistance']['options'],
+                format_func=lambda x: DEFAULT_COLORS['resistance']['labels'][x],
+                index=DEFAULT_COLORS['resistance']['options'].index(defaults['colors']['resistance']),
                 key=f"{key_prefix}_resistance_color"
             )
 
@@ -116,27 +134,26 @@ class IndicatorConfigManager:
 
         with col1:
             st.markdown("*Core Levels:*")
-            show_pivot = st.checkbox("Pivot Point (P)", value=True, key=f"{key_prefix}_show_P")
-            show_s1 = st.checkbox("Support 1 (S1)", value=True, key=f"{key_prefix}_show_S1")
-            show_s2 = st.checkbox("Support 2 (S2)", value=True, key=f"{key_prefix}_show_S2")
-            show_s3 = st.checkbox("Support 3 (S3)", value=True, key=f"{key_prefix}_show_S3")
+            show_pivot = st.checkbox("Pivot Point (P)", value=defaults['show_levels']['P'], key=f"{key_prefix}_show_P")
+            show_s1 = st.checkbox("Support 1 (S1)", value=defaults['show_levels']['S1'], key=f"{key_prefix}_show_S1")
+            show_s2 = st.checkbox("Support 2 (S2)", value=defaults['show_levels']['S2'], key=f"{key_prefix}_show_S2")
+            show_s3 = st.checkbox("Support 3 (S3)", value=defaults['show_levels']['S3'], key=f"{key_prefix}_show_S3")
 
         with col2:
             st.markdown("*Resistance Levels:*")
-            show_r1 = st.checkbox("Resistance 1 (R1)", value=True, key=f"{key_prefix}_show_R1")
-            show_r2 = st.checkbox("Resistance 2 (R2)", value=True, key=f"{key_prefix}_show_R2")
-            show_r3 = st.checkbox("Resistance 3 (R3)", value=True, key=f"{key_prefix}_show_R3")
-            st.markdown("*Extended Levels:*")
+            show_r1 = st.checkbox("Resistance 1 (R1)", value=defaults['show_levels']['R1'], key=f"{key_prefix}_show_R1")
+            show_r2 = st.checkbox("Resistance 2 (R2)", value=defaults['show_levels']['R2'], key=f"{key_prefix}_show_R2")
+            show_r3 = st.checkbox("Resistance 3 (R3)", value=defaults['show_levels']['R3'], key=f"{key_prefix}_show_R3")
 
         # Extended levels (collapsed by default)
         with st.expander("Extended Levels (R4, R5, S4, S5)"):
             col1, col2 = st.columns(2)
             with col1:
-                show_s4 = st.checkbox("Support 4 (S4)", value=False, key=f"{key_prefix}_show_S4")
-                show_s5 = st.checkbox("Support 5 (S5)", value=False, key=f"{key_prefix}_show_S5")
+                show_s4 = st.checkbox("Support 4 (S4)", value=defaults['show_levels']['S4'], key=f"{key_prefix}_show_S4")
+                show_s5 = st.checkbox("Support 5 (S5)", value=defaults['show_levels']['S5'], key=f"{key_prefix}_show_S5")
             with col2:
-                show_r4 = st.checkbox("Resistance 4 (R4)", value=False, key=f"{key_prefix}_show_R4")
-                show_r5 = st.checkbox("Resistance 5 (R5)", value=False, key=f"{key_prefix}_show_R5")
+                show_r4 = st.checkbox("Resistance 4 (R4)", value=defaults['show_levels']['R4'], key=f"{key_prefix}_show_R4")
+                show_r5 = st.checkbox("Resistance 5 (R5)", value=defaults['show_levels']['R5'], key=f"{key_prefix}_show_R5")
 
         config['show_levels'] = {
             'P': show_pivot,
