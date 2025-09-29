@@ -105,6 +105,29 @@ def show_data_preview():
             if applied_indicators_key not in st.session_state:
                 st.session_state[applied_indicators_key] = {}
 
+            # Sync applied state with toggle states BEFORE preparing chart
+            if available_indicators:
+                for indicator_name in available_indicators:
+                    enabled_key = f"indicator_enabled_{selected_symbol}_{indicator_name.replace(' ', '_')}"
+                    is_enabled = st.session_state.get(enabled_key, False)
+
+                    if is_enabled:
+                        # If enabled, ensure it's in applied state with default config
+                        if indicator_name not in st.session_state[applied_indicators_key]:
+                            default_config = indicator_manager.get_default_config(indicator_name)
+                            st.session_state[applied_indicators_key][indicator_name] = {
+                                'enabled': True,
+                                'config': default_config
+                            }
+                    else:
+                        # If disabled, remove from applied state
+                        if indicator_name in st.session_state[applied_indicators_key]:
+                            del st.session_state[applied_indicators_key][indicator_name]
+                        # Close settings panel when disabled
+                        settings_key = f"settings_visible_{selected_symbol}_{indicator_name.replace(' ', '_')}"
+                        if settings_key in st.session_state:
+                            st.session_state[settings_key] = False
+
             # Prepare active indicators from applied settings
             active_indicators = []
             if available_indicators:
@@ -252,7 +275,6 @@ def show_data_preview():
 
                         # Get current toggle state
                         enabled_key = f"indicator_enabled_{selected_symbol}_{indicator_name.replace(' ', '_')}"
-                        previous_state = st.session_state.get(enabled_key, False)
 
                         with col1:
                             # Toggle switch for enabling/disabling indicator
@@ -262,23 +284,6 @@ def show_data_preview():
                                 help=f"Enable/disable {indicator_name}",
                                 label_visibility="collapsed"
                             )
-
-                            # If toggle changed to enabled, apply default settings immediately
-                            if is_enabled and not previous_state:
-                                default_config = indicator_manager.get_default_config(indicator_name)
-                                st.session_state[applied_indicators_key][indicator_name] = {
-                                    'enabled': True,
-                                    'config': default_config
-                                }
-                                st.rerun()
-                            # If toggle changed to disabled, remove from applied
-                            elif not is_enabled and previous_state:
-                                if indicator_name in st.session_state[applied_indicators_key]:
-                                    del st.session_state[applied_indicators_key][indicator_name]
-                                # Close settings panel when disabled
-                                settings_key = f"settings_visible_{selected_symbol}_{indicator_name.replace(' ', '_')}"
-                                st.session_state[settings_key] = False
-                                st.rerun()
 
                         with col2:
                             # Settings gear icon (always visible)
