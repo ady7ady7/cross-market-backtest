@@ -96,126 +96,18 @@ def show_data_preview():
                     key=f"data_points_{selected_symbol}"
                 )
 
-            # Indicators section - placed right before the chart
-            st.subheader("🔧 Technical Indicators")
+            # Prepare indicators first (before chart data processing)
             indicator_manager = IndicatorConfigManager()
             available_indicators = indicator_manager.get_available_indicators()
 
+            # Initialize applied indicators state if not exists
+            applied_indicators_key = f"applied_indicators_{selected_symbol}"
+            if applied_indicators_key not in st.session_state:
+                st.session_state[applied_indicators_key] = {}
+
+            # Prepare active indicators from applied settings
+            active_indicators = []
             if available_indicators:
-                # Initialize applied indicators state if not exists
-                applied_indicators_key = f"applied_indicators_{selected_symbol}"
-                if applied_indicators_key not in st.session_state:
-                    st.session_state[applied_indicators_key] = {}
-
-                # Check if any settings are being configured
-                has_open_settings = False
-                for indicator_name in available_indicators:
-                    session_key = f"settings_visible_{selected_symbol}_{indicator_name.replace(' ', '_')}"
-                    if st.session_state.get(session_key, False):
-                        has_open_settings = True
-                        break
-
-                # Save & Apply button - only show if settings are open
-                if has_open_settings:
-                    st.markdown("---")
-                    col_save1, col_save2, col_save3 = st.columns([2, 2, 6])
-
-                    with col_save1:
-                        if st.button("💾 **Save & Apply**", type="primary", help="Apply current indicator settings to chart"):
-                            # Apply all current settings
-                            for indicator_name in available_indicators:
-                                enabled_key = f"indicator_enabled_{selected_symbol}_{indicator_name.replace(' ', '_')}"
-                                settings_key = f"settings_visible_{selected_symbol}_{indicator_name.replace(' ', '_')}"
-
-                                is_enabled = st.session_state.get(enabled_key, False)
-
-                                if is_enabled:
-                                    # Get current configuration
-                                    if st.session_state.get(settings_key, False):
-                                        # Settings panel is open, create config from UI (but don't render UI)
-                                        config = indicator_manager.get_current_config_from_session(
-                                            indicator_name,
-                                            f"{selected_symbol}_{indicator_name.replace(' ', '_')}"
-                                        )
-                                    else:
-                                        config = indicator_manager.get_default_config(indicator_name)
-
-                                    st.session_state[applied_indicators_key][indicator_name] = {
-                                        'enabled': True,
-                                        'config': config
-                                    }
-                                else:
-                                    # Remove from applied if disabled
-                                    if indicator_name in st.session_state[applied_indicators_key]:
-                                        del st.session_state[applied_indicators_key][indicator_name]
-
-                            # Close all settings panels
-                            for indicator_name in available_indicators:
-                                settings_key = f"settings_visible_{selected_symbol}_{indicator_name.replace(' ', '_')}"
-                                st.session_state[settings_key] = False
-
-                            st.rerun()
-
-                    with col_save2:
-                        if st.button("❌ Cancel", help="Cancel changes and close settings"):
-                            # Close all settings panels without applying
-                            for indicator_name in available_indicators:
-                                settings_key = f"settings_visible_{selected_symbol}_{indicator_name.replace(' ', '_')}"
-                                st.session_state[settings_key] = False
-                            st.rerun()
-
-                    st.markdown("---")
-
-                for indicator_name in available_indicators:
-                    # Create container with border for each indicator
-                    with st.container(border=True):
-                        # Create columns for toggle, gear icon (next to each other), and indicator name
-                        col1, col2, col3 = st.columns([1, 1, 8])
-
-                        with col1:
-                            # Toggle switch for enabling/disabling indicator
-                            enabled_key = f"indicator_enabled_{selected_symbol}_{indicator_name.replace(' ', '_')}"
-                            is_enabled = st.toggle(
-                                "",
-                                key=enabled_key,
-                                help=f"Enable/disable {indicator_name}"
-                            )
-
-                        with col2:
-                            # Settings gear icon (always visible)
-                            settings_key = f"show_settings_{selected_symbol}_{indicator_name.replace(' ', '_')}"
-                            show_settings = st.button(
-                                "⚙️",
-                                key=settings_key,
-                                help=f"Configure {indicator_name} settings"
-                            )
-
-                            # Store settings visibility state
-                            if show_settings:
-                                session_key = f"settings_visible_{selected_symbol}_{indicator_name.replace(' ', '_')}"
-                                st.session_state[session_key] = not st.session_state.get(session_key, False)
-
-                        with col3:
-                            # Indicator name with applied status
-                            applied_status = ""
-                            if indicator_name in st.session_state[applied_indicators_key]:
-                                applied_status = " ✅"
-                            st.write(f"**{indicator_name}**{applied_status}")
-
-                        # Show settings panel if expanded
-                        session_key = f"settings_visible_{selected_symbol}_{indicator_name.replace(' ', '_')}"
-                        if st.session_state.get(session_key, False):
-                            with st.container():
-                                st.markdown("---")
-                                st.info("⚠️ Configure settings above, then click **Save & Apply** to update the chart.")
-                                config = indicator_manager.create_indicator_config_ui(
-                                    indicator_name,
-                                    f"{selected_symbol}_{indicator_name.replace(' ', '_')}"
-                                )
-                                st.markdown("---")
-
-                # Prepare active indicators from applied settings (not draft settings)
-                active_indicators = []
                 for indicator_name, indicator_data in st.session_state[applied_indicators_key].items():
                     if indicator_data['enabled']:
                         try:
@@ -224,12 +116,9 @@ def show_data_preview():
                         except Exception as e:
                             st.error(f"Error creating {indicator_name}: {str(e)}")
 
-                # Store applied indicators in session state
-                indicators_key = f"active_indicators_{selected_symbol}"
-                st.session_state[indicators_key] = active_indicators
-            else:
-                st.info("No indicators available.")
-                st.session_state[f"active_indicators_{selected_symbol}"] = []
+            # Store applied indicators in session state
+            indicators_key = f"active_indicators_{selected_symbol}"
+            st.session_state[indicators_key] = active_indicators
 
             # Interactive price chart
             st.subheader("📈 Interactive Price Chart")
@@ -349,3 +238,107 @@ def show_data_preview():
                     if hasattr(indicator, 'data') and indicator.data is not None and not indicator.data.empty:
                         with st.expander(f"{indicator.name} - Data Sample", expanded=False):
                             st.dataframe(indicator.data.head(10), width='stretch')
+
+            # Technical Indicators Configuration Section - at the bottom
+            st.markdown("---")
+            st.subheader("🔧 Technical Indicators Configuration")
+
+            if available_indicators:
+                for indicator_name in available_indicators:
+                    # Create container with border for each indicator
+                    with st.container(border=True):
+                        # Create columns for toggle, gear icon (next to each other), and indicator name
+                        col1, col2, col3 = st.columns([1, 1, 8])
+
+                        # Get current toggle state
+                        enabled_key = f"indicator_enabled_{selected_symbol}_{indicator_name.replace(' ', '_')}"
+                        previous_state = st.session_state.get(enabled_key, False)
+
+                        with col1:
+                            # Toggle switch for enabling/disabling indicator
+                            is_enabled = st.toggle(
+                                "",
+                                key=enabled_key,
+                                help=f"Enable/disable {indicator_name}"
+                            )
+
+                            # If toggle changed to enabled, apply default settings immediately
+                            if is_enabled and not previous_state:
+                                default_config = indicator_manager.get_default_config(indicator_name)
+                                st.session_state[applied_indicators_key][indicator_name] = {
+                                    'enabled': True,
+                                    'config': default_config
+                                }
+                                st.rerun()
+                            # If toggle changed to disabled, remove from applied
+                            elif not is_enabled and previous_state:
+                                if indicator_name in st.session_state[applied_indicators_key]:
+                                    del st.session_state[applied_indicators_key][indicator_name]
+                                # Close settings panel when disabled
+                                settings_key = f"settings_visible_{selected_symbol}_{indicator_name.replace(' ', '_')}"
+                                st.session_state[settings_key] = False
+                                st.rerun()
+
+                        with col2:
+                            # Settings gear icon (always visible)
+                            settings_key = f"show_settings_{selected_symbol}_{indicator_name.replace(' ', '_')}"
+                            show_settings = st.button(
+                                "⚙️",
+                                key=settings_key,
+                                help=f"Configure {indicator_name} settings"
+                            )
+
+                            # Store settings visibility state
+                            if show_settings:
+                                session_key = f"settings_visible_{selected_symbol}_{indicator_name.replace(' ', '_')}"
+                                st.session_state[session_key] = not st.session_state.get(session_key, False)
+
+                        with col3:
+                            # Indicator name with applied status
+                            applied_status = ""
+                            if indicator_name in st.session_state[applied_indicators_key]:
+                                applied_status = " ✅"
+                            st.write(f"**{indicator_name}**{applied_status}")
+
+                        # Show settings panel if expanded
+                        session_key = f"settings_visible_{selected_symbol}_{indicator_name.replace(' ', '_')}"
+                        if st.session_state.get(session_key, False):
+                            with st.container():
+                                st.markdown("---")
+                                st.info("⚠️ Configure settings below, then click **Save & Apply** to update the chart.")
+                                config = indicator_manager.create_indicator_config_ui(
+                                    indicator_name,
+                                    f"{selected_symbol}_{indicator_name.replace(' ', '_')}"
+                                )
+
+                                # Save & Apply buttons at the bottom of settings panel
+                                st.markdown("---")
+                                col_save1, col_save2 = st.columns([1, 1])
+
+                                with col_save1:
+                                    if st.button("💾 **Save & Apply**", type="primary", help="Apply current settings to chart", key=f"save_{indicator_name}_{selected_symbol}"):
+                                        # Get current configuration from session state
+                                        config = indicator_manager.get_current_config_from_session(
+                                            indicator_name,
+                                            f"{selected_symbol}_{indicator_name.replace(' ', '_')}"
+                                        )
+
+                                        # Apply the settings
+                                        st.session_state[applied_indicators_key][indicator_name] = {
+                                            'enabled': True,
+                                            'config': config
+                                        }
+
+                                        # Close settings panel
+                                        st.session_state[session_key] = False
+                                        st.rerun()
+
+                                with col_save2:
+                                    if st.button("❌ Cancel", help="Cancel changes and close settings", key=f"cancel_{indicator_name}_{selected_symbol}"):
+                                        # Close settings panel without applying
+                                        st.session_state[session_key] = False
+                                        st.rerun()
+
+                                st.markdown("---")
+            else:
+                st.info("No indicators available.")
