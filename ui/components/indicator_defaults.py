@@ -37,8 +37,8 @@ def get_indicator_defaults() -> Dict[str, Dict[str, Any]]:
     return {
         'Pivot Points': {
             'enabled': False,
-            'start_time': '00:00',
-            'end_time': '23:59',
+            'start_time': '06:00',
+            'end_time': '20:00',
             'colors': {
                 'pivot': DEFAULT_COLORS['pivot']['default'],
                 'support': DEFAULT_COLORS['support']['default'],

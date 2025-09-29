@@ -81,7 +81,7 @@ def show_data_preview():
 
             # Data preview
             st.subheader("📋 Data Sample")
-            st.dataframe(df.head(20), use_container_width=True)
+            st.dataframe(df.head(20), width='stretch')
 
             # Interactive price chart
             st.subheader("📈 Interactive Price Chart")
@@ -97,15 +97,15 @@ def show_data_preview():
                     st.markdown("### Available Indicators")
 
                     for indicator_name in available_indicators:
-                        # Create container for each indicator
-                        with st.container():
+                        # Create container with border for each indicator
+                        with st.container(border=True):
                             # Create columns for toggle, name, and gear icon
                             col1, col2, col3 = st.columns([1, 4, 1])
 
                             with col1:
                                 # Toggle switch for enabling/disabling indicator
                                 enabled_key = f"indicator_enabled_{selected_symbol}_{indicator_name.replace(' ', '_')}"
-                                is_enabled = st.checkbox(
+                                is_enabled = st.toggle(
                                     "",
                                     key=enabled_key,
                                     help=f"Enable/disable {indicator_name}"
@@ -169,7 +169,7 @@ def show_data_preview():
                 data_points = st.selectbox(
                     "Data points:",
                     [500, 1000, 2000, 5000, 10000, 20000, "Range Slider"],
-                    index=1,
+                    index=6,  # Default to "Range Slider" (index 6)
                     help="Select number of recent data points to display or use Range Slider for large datasets",
                     key=f"data_points_{selected_symbol}"
                 )
@@ -280,7 +280,7 @@ def show_data_preview():
                 selected_symbol,
                 indicators=calculated_indicators
             )
-            st.plotly_chart(fig, use_container_width=True, config=config)
+            st.plotly_chart(fig, width='stretch', config=config)
 
             # Display indicator information if any are active
             if calculated_indicators:
@@ -288,4 +288,4 @@ def show_data_preview():
                 for indicator in calculated_indicators:
                     if hasattr(indicator, 'data') and indicator.data is not None and not indicator.data.empty:
                         with st.expander(f"{indicator.name} - Data Sample", expanded=False):
-                            st.dataframe(indicator.data.head(10), use_container_width=True)
+                            st.dataframe(indicator.data.head(10), width='stretch')
