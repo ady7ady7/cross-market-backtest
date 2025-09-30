@@ -213,10 +213,15 @@ day_of_week TEXT NOT NULL
 ```
 
 Symbol metadata includes:
+- Symbol name (e.g., 'xauusd', 'ETH/USDT')
+- **Timeframe** (e.g., '1m', '5m', '15m', '30m', '1h', '4h', '1d')
+- Table name (where the data is stored)
 - Asset type (tradfi/crypto)
 - Exchange information
 - Data coverage statistics
 - Update timestamps
+
+**Note**: Each symbol can have data in multiple timeframes, stored in separate tables. The metadata table tracks all available symbol-timeframe combinations.
 
 ## Development
 
