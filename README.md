@@ -1,48 +1,76 @@
 # Cross-Market Backtest Application
 
-A Python application for cross-market backtesting with market data from multiple exchanges and asset types (TradFi and Crypto). Features an intuitive web interface with advanced charting and technical indicator overlays.
+A comprehensive Python application for cross-market backtesting with market data from multiple exchanges and asset types (TradFi and Crypto). Features an intuitive web interface with advanced charting, technical indicators, and a full-featured backtesting engine for multi-strategy, multi-timeframe analysis.
 
 ## Features
 
+### Data & Visualization
 - 🗄️ **Database Integration**: Connects to PostgreSQL with SSL certificate authentication
 - 📊 **Multi-Asset Support**: Handles both traditional finance and cryptocurrency data
 - 🎯 **Symbol Management**: Easy configuration of which symbols to include/exclude from analysis
 - 🖥️ **Interactive Web UI**: Modern Streamlit interface with tabbed navigation
 - 📈 **Advanced Charting**: Interactive candlestick charts with zoom, pan, and range navigation
-- 🔧 **Technical Indicators**: Configurable indicators with real-time overlays (Pivot Points, etc.)
+- 🔧 **Technical Indicators**: Configurable indicators with real-time overlays (Pivot Points, HTS, etc.)
 - 🎨 **Customizable Settings**: Color themes, time ranges, and display options for indicators
 - 📊 **Data Range Navigation**: Efficient handling of large datasets with slider controls
-- 🏗️ **Modular Architecture**: Clean, extensible code structure with component-based UI
+
+### Backtesting & Analysis ⭐ NEW
+- 🚀 **Multi-Timeframe Backtesting**: Test strategies using multiple timeframes with proper time alignment
+- 🎯 **Multi-Strategy Support**: Run multiple strategies simultaneously and track performance individually
+- 💼 **Advanced Position Management**: Multiple SL/TP types (%, R:R, time-based, condition-based)
+- 📉 **Partial Exits**: Close positions in stages (e.g., 50% at 2R, 50% at 3R)
+- 🛡️ **Risk Management**: Maximum total risk limits across all open positions
+- 📊 **Comprehensive Analytics**: Equity curves, drawdowns, Sharpe/Sortino ratios, win rates, and more
+- 📈 **Performance Visualization**: Interactive charts for equity, drawdowns, trade distribution, and R-multiples
+- 🏗️ **Extensible Strategy Framework**: Easy-to-use base class for creating custom strategies
+
+### Architecture
+- 🏗️ **Modular Design**: Clean, extensible code structure with component-based UI
+- 📝 **Well Documented**: Comprehensive documentation for all features
+- 🔌 **Easy Integration**: Simple API for programmatic backtesting
 
 ## Project Structure
 
 ```
 cross-market-backtest/
-├── src/                      # Core application modules
-│   ├── database.py           # Database connection and SSL handling
-│   ├── data_fetcher.py       # Market data fetching functions
-│   └── indicators/           # Technical indicator implementations
-│       ├── __init__.py       # Indicator exports
-│       ├── base.py           # Base indicator interface
-│       └── pivot_points.py   # Pivot Points indicator
-├── ui/                       # Streamlit web interface
-│   ├── app.py               # Main UI application with tabs
-│   └── components/          # Modular UI components
-│       ├── analysis_section.py     # Analysis tab functionality
-│       ├── chart_utils.py          # Interactive chart utilities
-│       ├── data_loader.py          # Data loading components
-│       ├── data_preview.py         # Data preview with charts/indicators
-│       ├── indicator_config.py     # Indicator configuration UI
-│       ├── indicator_defaults.py   # Default indicator settings
-│       └── symbol_management.py    # Symbol management interface
-├── certs/                   # SSL certificates
+├── src/                           # Core application modules
+│   ├── database.py                # Database connection and SSL handling
+│   ├── data_fetcher.py            # Market data fetching functions
+│   ├── indicators/                # Technical indicator implementations
+│   │   ├── __init__.py            # Indicator exports
+│   │   ├── base.py                # Base indicator interface
+│   │   ├── pivot_points.py        # Pivot Points indicator
+│   │   └── hts.py                 # HTS indicator
+│   └── backtesting/               # ⭐ Backtesting engine
+│       ├── __init__.py            # Package exports
+│       ├── engine.py              # Main backtesting engine
+│       ├── data_alignment.py      # Multi-timeframe data alignment
+│       ├── strategy.py            # Base strategy class and signal handling
+│       ├── position.py            # Position and position manager
+│       ├── performance.py         # Performance tracking and metrics
+│       └── example_strategies.py  # Example strategy implementations
+├── ui/                            # Streamlit web interface
+│   ├── app.py                    # Main UI application with tabs
+│   └── components/               # Modular UI components
+│       ├── analysis_section.py   # ⭐ Backtesting tab (fully functional)
+│       ├── backtest_config.py    # ⭐ Backtest configuration UI
+│       ├── backtest_results.py   # ⭐ Results visualization
+│       ├── chart_utils.py        # Interactive chart utilities
+│       ├── data_loader.py        # Data loading components
+│       ├── data_preview.py       # Data preview with charts/indicators
+│       ├── indicator_config.py   # Indicator configuration UI
+│       ├── indicator_defaults.py # Default indicator settings
+│       └── symbol_management.py  # Symbol management interface
+├── certs/                         # SSL certificates
 │   └── ca-certificate.crt
-├── config.py               # Environment configuration
-├── symbols_config.py       # Symbol management configuration
-├── main.py                # CLI data fetching script
-├── run_ui.py              # UI launcher script
-├── requirements.txt       # Python dependencies
-└── .env                   # Environment variables (create this)
+├── config.py                     # Environment configuration
+├── symbols_config.py             # Symbol management configuration
+├── main.py                       # CLI data fetching script
+├── run_ui.py                     # UI launcher script
+├── requirements.txt              # Python dependencies
+├── README.md                     # This file
+├── ANALYSIS.md                   # ⭐ Complete backtesting documentation
+└── .env                          # Environment variables (create this)
 ```
 
 ## Setup Instructions
@@ -121,7 +149,7 @@ The UI will be available at http://localhost:8501
    - Real-time symbol status updates
 
 2. **Data Preview Tab**:
-   - Symbol selection and data loading
+   - Symbol and timeframe selection
    - Comprehensive data statistics and samples
    - **Interactive Charts**:
      - Zoom, pan, and double-click reset
@@ -132,10 +160,23 @@ The UI will be available at http://localhost:8501
      - Expandable settings with gear icon controls
      - Live indicator overlays on charts
      - Configurable colors, time ranges, and display levels
-     - Currently supports: Pivot Points (with S1-S5, R1-R5 levels)
+     - Currently supports: Pivot Points, HTS (High/Low EMAs)
 
-3. **Analysis Tab**:
-   - Foundation for future backtesting and strategy features
+3. **Analysis Tab** ⭐ NEW:
+   - **Full Backtesting Engine**: Test trading strategies on historical data
+   - **Configuration UI**:
+     - Symbol and multi-timeframe selection
+     - Capital and risk management settings
+     - Strategy type selection (built-in or custom)
+     - Advanced position management (SL/TP types, partial exits)
+   - **Results Visualization**:
+     - Interactive equity curve with realized/unrealized P&L
+     - Drawdown analysis with charts and statistics
+     - Trade-by-trade analysis with P&L and R-multiple distributions
+     - Comprehensive performance metrics (Sharpe, Sortino, win rate, profit factor, etc.)
+     - Export trades to CSV
+   - **Multi-Strategy Support**: Test multiple strategies simultaneously
+   - See [ANALYSIS.md](ANALYSIS.md) for complete documentation
 
 ## Available Symbols
 
@@ -476,15 +517,80 @@ If you get "Module not found" errors:
 2. Check that port 8501 is available
 3. Verify all dependencies are installed
 
+## Backtesting & Analysis
+
+The application includes a comprehensive backtesting engine. For complete documentation, see [ANALYSIS.md](ANALYSIS.md).
+
+### Quick Start - Backtesting
+
+**Via UI:**
+1. Go to **Analysis** tab
+2. Select symbol and timeframes
+3. Configure strategy (e.g., Simple MA Crossover)
+4. Set risk parameters and position management
+5. Click "Run Backtest"
+6. View results: equity curve, metrics, trades
+
+**Programmatically:**
+```python
+from src.backtesting import BacktestEngine
+from src.backtesting.example_strategies import SimpleMAStrategy
+
+# Create strategy
+strategy = SimpleMAStrategy(config={
+    'fast_period': 20,
+    'slow_period': 50,
+    'risk_percent': 1.0,
+    'sl_percent': 2.0,
+    'tp_rr_ratio': 2.0
+})
+
+# Run backtest
+backtest = BacktestEngine(initial_capital=10000)
+results = backtest.run(
+    strategies=[strategy],
+    data_dict={'1h': your_data}
+)
+
+# View results
+print(results['summary'])
+```
+
+### Creating Custom Strategies
+
+```python
+from src.backtesting.strategy import BaseStrategy, StrategySignal
+from src.backtesting.position import PositionSide
+
+class MyStrategy(BaseStrategy):
+    def generate_signals(self, data, timestamp):
+        # Your signal logic
+        if condition:
+            return StrategySignal(timestamp, PositionSide.LONG)
+        return None
+
+    def should_exit(self, position, data, timestamp):
+        # Your exit logic
+        return False
+```
+
+See [ANALYSIS.md](ANALYSIS.md) for:
+- Complete architecture overview
+- Multi-timeframe strategies
+- Advanced position management
+- Performance metrics explanation
+- Best practices and examples
+
 ## Future Enhancements
 
 ### Core Functionality
-- [ ] Backtesting engine implementation
-- [ ] Strategy configuration interface
-- [ ] Performance metrics and reporting
-- [ ] Multi-timeframe analysis
-- [ ] Portfolio optimization features
-- [ ] Risk management tools
+- [x] ⭐ Backtesting engine implementation
+- [x] ⭐ Strategy configuration interface
+- [x] ⭐ Performance metrics and reporting
+- [x] ⭐ Multi-timeframe analysis
+- [ ] Commission and slippage modeling
+- [ ] Portfolio optimization features (multi-symbol backtesting)
+- [ ] Strategy optimization (parameter grid search)
 
 ### Technical Indicators
 - [ ] Moving Averages (SMA, EMA, WMA)
