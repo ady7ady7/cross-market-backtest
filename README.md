@@ -200,8 +200,18 @@ The application currently supports these symbols:
 
 ## Data Schema
 
-Market data follows this structure:
+### Market Data Tables
 
+Each symbol-timeframe combination has its own table with OHLCV data. The timeframe is **not stored as a column** but is reflected in the **table name** itself.
+
+**Table naming convention**: `{symbol}_{timeframe}_{asset_type}_ohlcv`
+
+Examples:
+- `eurusd_m5_tradfi_ohlcv` - EUR/USD 5-minute data
+- `xauusd_1h_tradfi_ohlcv` - Gold 1-hour data
+- `ethusdt_m15_crypto_ohlcv` - Ethereum 15-minute data
+
+**Table structure**:
 ```sql
 timestamp TIMESTAMPTZ NOT NULL,
 open DECIMAL(12, 8) NOT NULL,
@@ -212,16 +222,29 @@ volume DECIMAL(20, 8) DEFAULT NULL,
 day_of_week TEXT NOT NULL
 ```
 
-Symbol metadata includes:
-- Symbol name (e.g., 'xauusd', 'ETH/USDT')
-- **Timeframe** (e.g., '1m', '5m', '15m', '30m', '1h', '4h', '1d')
-- Table name (where the data is stored)
-- Asset type (tradfi/crypto)
-- Exchange information
-- Data coverage statistics
-- Update timestamps
+**Note**: The timeframe information is embedded in the table name (e.g., `m5`, `1h`, `4h`), not as a separate column in the data.
 
-**Note**: Each symbol can have data in multiple timeframes, stored in separate tables. The metadata table tracks all available symbol-timeframe combinations.
+### Symbol Metadata Table
+
+The `symbol_metadata` table tracks all available symbol-timeframe combinations:
+
+```sql
+symbol TEXT NOT NULL,
+timeframe TEXT NOT NULL,
+table_name TEXT NOT NULL,
+asset_type TEXT NOT NULL,
+exchange TEXT,
+-- Additional fields for coverage statistics, timestamps, etc.
+```
+
+**Key fields:**
+- **symbol**: Symbol identifier (e.g., 'xauusd', 'ETH/USDT')
+- **timeframe**: Data interval (e.g., '1m', '5m', '15m', '30m', '1h', '4h', '1d')
+- **table_name**: Name of the table containing the OHLCV data for this symbol-timeframe
+- **asset_type**: Asset class ('tradfi' or 'crypto')
+- **exchange**: Exchange name where data is sourced
+
+**Example**: Symbol 'xauusd' might have entries for timeframes '1m', '5m', '1h', '4h', and '1d', each pointing to a different data table.
 
 ## Development
 
