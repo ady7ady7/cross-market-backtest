@@ -27,35 +27,57 @@ def show_data_preview():
         st.warning("⚠️ No symbols selected. Go to Symbol Management to select symbols for analysis.")
         return
 
-    # Symbol selector
-    selected_symbol = st.selectbox(
-        "Select symbol to preview:",
-        used_symbols,
-        help="Choose a symbol to preview its market data"
-    )
+    # Get available timeframes from metadata
+    if st.session_state.metadata_df is not None:
+        available_timeframes = sorted(st.session_state.metadata_df['timeframe'].unique())
+    else:
+        available_timeframes = ['1h']  # Default fallback
+
+    # Timeframe selector
+    col1, col2 = st.columns([1, 2])
+    with col1:
+        selected_timeframe = st.selectbox(
+            "Select timeframe:",
+            available_timeframes,
+            help="Choose a timeframe to view"
+        )
+
+    with col2:
+        # Symbol selector
+        selected_symbol = st.selectbox(
+            "Select symbol to preview:",
+            used_symbols,
+            help="Choose a symbol to preview its market data"
+        )
 
     if selected_symbol and st.session_state.metadata_df is not None:
-        # Get table information for selected symbol
+        # Get table information for selected symbol and timeframe
         symbol_info = st.session_state.metadata_df[
-            st.session_state.metadata_df['symbol'] == selected_symbol
-        ].iloc[0]
+            (st.session_state.metadata_df['symbol'] == selected_symbol) &
+            (st.session_state.metadata_df['timeframe'] == selected_timeframe)
+        ]
 
+        if symbol_info.empty:
+            st.warning(f"⚠️ No data available for {selected_symbol} at {selected_timeframe} timeframe.")
+            return
+
+        symbol_info = symbol_info.iloc[0]
         table_name = symbol_info['table_name']
 
-        # Initialize session state for current symbol data
-        current_data_key = f"current_data_{selected_symbol}"
+        # Initialize session state for current symbol data (include timeframe in key)
+        current_data_key = f"current_data_{selected_symbol}_{selected_timeframe}"
 
         # Load data button
-        if st.button(f"📈 Load Data for {selected_symbol}", type="primary"):
+        if st.button(f"📈 Load Data for {selected_symbol} ({selected_timeframe})", type="primary"):
             try:
-                with st.spinner(f"Loading {selected_symbol} data..."):
+                with st.spinner(f"Loading {selected_symbol} data for {selected_timeframe}..."):
                     engine = create_db_connection()
                     df = fetch_market_data(engine, table_name, selected_symbol)
                     st.session_state.market_data[table_name] = df
                     st.session_state[current_data_key] = df
 
             except Exception as e:
-                st.error(f"❌ Error loading data for {selected_symbol}: {str(e)}")
+                st.error(f"❌ Error loading data for {selected_symbol} ({selected_timeframe}): {str(e)}")
                 return
 
         # Check if we have data for the current symbol
@@ -93,7 +115,7 @@ def show_data_preview():
                     [500, 1000, 2000, 5000, 10000, 20000, "Range Slider"],
                     index=6,  # Default to "Range Slider" (index 6)
                     help="Select number of recent data points to display or use Range Slider for large datasets",
-                    key=f"data_points_{selected_symbol}"
+                    key=f"data_points_{selected_symbol}_{selected_timeframe}"
                 )
 
             # Prepare indicators first (before chart data processing)
@@ -101,14 +123,14 @@ def show_data_preview():
             available_indicators = indicator_manager.get_available_indicators()
 
             # Initialize applied indicators state if not exists
-            applied_indicators_key = f"applied_indicators_{selected_symbol}"
+            applied_indicators_key = f"applied_indicators_{selected_symbol}_{selected_timeframe}"
             if applied_indicators_key not in st.session_state:
                 st.session_state[applied_indicators_key] = {}
 
             # Sync applied state with toggle states BEFORE preparing chart
             if available_indicators:
                 for indicator_name in available_indicators:
-                    enabled_key = f"indicator_enabled_{selected_symbol}_{indicator_name.replace(' ', '_')}"
+                    enabled_key = f"indicator_enabled_{selected_symbol}_{selected_timeframe}_{indicator_name.replace(' ', '_')}"
                     is_enabled = st.session_state.get(enabled_key, False)
 
                     if is_enabled:
@@ -124,7 +146,7 @@ def show_data_preview():
                         if indicator_name in st.session_state[applied_indicators_key]:
                             del st.session_state[applied_indicators_key][indicator_name]
                         # Close settings panel when disabled
-                        settings_key = f"settings_visible_{selected_symbol}_{indicator_name.replace(' ', '_')}"
+                        settings_key = f"settings_visible_{selected_symbol}_{selected_timeframe}_{indicator_name.replace(' ', '_')}"
                         if settings_key in st.session_state:
                             st.session_state[settings_key] = False
 
@@ -140,7 +162,7 @@ def show_data_preview():
                             st.error(f"Error creating {indicator_name}: {str(e)}")
 
             # Store applied indicators in session state
-            indicators_key = f"active_indicators_{selected_symbol}"
+            indicators_key = f"active_indicators_{selected_symbol}_{selected_timeframe}"
             st.session_state[indicators_key] = active_indicators
 
             # Interactive price chart
@@ -149,7 +171,7 @@ def show_data_preview():
             # Prepare chart data based on selection
             if data_points == "Range Slider":
                 # Initialize session state for range slider
-                slider_key = f"range_slider_{selected_symbol}"
+                slider_key = f"range_slider_{selected_symbol}_{selected_timeframe}"
                 if slider_key not in st.session_state:
                     st.session_state[slider_key] = 0
 
@@ -199,7 +221,7 @@ def show_data_preview():
                         max_value=max(0, total_ranges - 1),
                         value=st.session_state[slider_key],
                         help=f"Slide to navigate through {total_records:,} total records",
-                        key=f"slider_control_{selected_symbol}"
+                        key=f"slider_control_{selected_symbol}_{selected_timeframe}"
                     )
 
                     if range_position != st.session_state[slider_key]:
@@ -235,7 +257,7 @@ def show_data_preview():
 
             # Calculate indicators for chart data
             calculated_indicators = []
-            indicators_key = f"active_indicators_{selected_symbol}"
+            indicators_key = f"active_indicators_{selected_symbol}_{selected_timeframe}"
 
             if indicators_key in st.session_state and st.session_state[indicators_key]:
                 for indicator in st.session_state[indicators_key]:
@@ -274,7 +296,7 @@ def show_data_preview():
                         col1, col2, col3 = st.columns([1, 1, 8])
 
                         # Get current toggle state
-                        enabled_key = f"indicator_enabled_{selected_symbol}_{indicator_name.replace(' ', '_')}"
+                        enabled_key = f"indicator_enabled_{selected_symbol}_{selected_timeframe}_{indicator_name.replace(' ', '_')}"
 
                         with col1:
                             # Toggle switch for enabling/disabling indicator
@@ -287,7 +309,7 @@ def show_data_preview():
 
                         with col2:
                             # Settings gear icon (always visible)
-                            settings_key = f"show_settings_{selected_symbol}_{indicator_name.replace(' ', '_')}"
+                            settings_key = f"show_settings_{selected_symbol}_{selected_timeframe}_{indicator_name.replace(' ', '_')}"
                             show_settings = st.button(
                                 "⚙️",
                                 key=settings_key,
@@ -296,7 +318,7 @@ def show_data_preview():
 
                             # Store settings visibility state
                             if show_settings:
-                                session_key = f"settings_visible_{selected_symbol}_{indicator_name.replace(' ', '_')}"
+                                session_key = f"settings_visible_{selected_symbol}_{selected_timeframe}_{indicator_name.replace(' ', '_')}"
                                 st.session_state[session_key] = not st.session_state.get(session_key, False)
 
                         with col3:
@@ -307,14 +329,14 @@ def show_data_preview():
                             st.write(f"**{indicator_name}**{applied_status}")
 
                         # Show settings panel if expanded
-                        session_key = f"settings_visible_{selected_symbol}_{indicator_name.replace(' ', '_')}"
+                        session_key = f"settings_visible_{selected_symbol}_{selected_timeframe}_{indicator_name.replace(' ', '_')}"
                         if st.session_state.get(session_key, False):
                             with st.container():
                                 st.markdown("---")
                                 st.info("⚠️ Configure settings below, then click **Save & Apply** to update the chart.")
                                 config = indicator_manager.create_indicator_config_ui(
                                     indicator_name,
-                                    f"{selected_symbol}_{indicator_name.replace(' ', '_')}"
+                                    f"{selected_symbol}_{selected_timeframe}_{indicator_name.replace(' ', '_')}"
                                 )
 
                                 # Save & Apply buttons at the bottom of settings panel
@@ -322,11 +344,11 @@ def show_data_preview():
                                 col_save1, col_save2 = st.columns([1, 1])
 
                                 with col_save1:
-                                    if st.button("💾 **Save & Apply**", type="primary", help="Apply current settings to chart", key=f"save_{indicator_name}_{selected_symbol}"):
+                                    if st.button("💾 **Save & Apply**", type="primary", help="Apply current settings to chart", key=f"save_{indicator_name}_{selected_symbol}_{selected_timeframe}"):
                                         # Get current configuration from session state
                                         config = indicator_manager.get_current_config_from_session(
                                             indicator_name,
-                                            f"{selected_symbol}_{indicator_name.replace(' ', '_')}"
+                                            f"{selected_symbol}_{selected_timeframe}_{indicator_name.replace(' ', '_')}"
                                         )
 
                                         # Apply the settings
@@ -340,7 +362,7 @@ def show_data_preview():
                                         st.rerun()
 
                                 with col_save2:
-                                    if st.button("❌ Cancel", help="Cancel changes and close settings", key=f"cancel_{indicator_name}_{selected_symbol}"):
+                                    if st.button("❌ Cancel", help="Cancel changes and close settings", key=f"cancel_{indicator_name}_{selected_symbol}_{selected_timeframe}"):
                                         # Close settings panel without applying
                                         st.session_state[session_key] = False
                                         st.rerun()
