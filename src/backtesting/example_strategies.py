@@ -26,14 +26,15 @@ class SimpleMAStrategy(BaseStrategy):
             'slow_period': 50,
             'risk_percent': 1.0,
             'sl_percent': 2.0,
-            'tp_rr_ratio': 2.0
+            'tp_rr_ratio': 2.0,
+            'timeframes': ['1h']  # Default timeframe
         }
         if config:
             default_config.update(config)
 
         super().__init__(
             name="Simple MA Crossover",
-            timeframes=['1h'],  # Single timeframe
+            timeframes=default_config['timeframes'],  # Use timeframes from config
             config=default_config
         )
 

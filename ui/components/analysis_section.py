@@ -77,9 +77,9 @@ def _run_backtest(config: dict):
     try:
         with st.spinner("Loading data and running backtest..."):
 
-            # Load data for all timeframes
+            # Load data for all timeframes (reuse cached data if available)
             data_dict = {}
-            engine_db = create_db_connection()
+            engine_db = None
 
             for timeframe in config['timeframes']:
                 # Get table name from metadata
@@ -94,14 +94,24 @@ def _run_backtest(config: dict):
 
                 table_name = symbol_info.iloc[0]['table_name']
 
-                # Fetch data
-                df = fetch_market_data(engine_db, table_name, config['symbol'])
+                # Check if data is already loaded in session state
+                if table_name in st.session_state.market_data:
+                    df = st.session_state.market_data[table_name]
+                else:
+                    # Load fresh data if not cached
+                    if engine_db is None:
+                        engine_db = create_db_connection()
+                    df = fetch_market_data(engine_db, table_name, config['symbol'])
+                    # Cache it for future use
+                    st.session_state.market_data[table_name] = df
+
                 data_dict[timeframe] = df
 
             # Create strategy based on config
             if config['strategy_type'] == "Simple MA Crossover":
                 strategy_config = {
                     **config['strategy_params'],
+                    'timeframes': config['timeframes'],  # Pass selected timeframes to strategy
                     'risk_percent': config['risk_per_trade'],
                     'sl_type': config['sl_type'],
                     'sl_percent': config.get('sl_percent'),
