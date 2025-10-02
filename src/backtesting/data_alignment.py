@@ -10,32 +10,27 @@ are available to avoid lookahead bias. For example, at 08:04 on m1:
 import pandas as pd
 from typing import Dict, List, Optional
 from datetime import datetime, timedelta
+from ..utils import TimeframeNormalizer
 
 
 class MultiTimeframeAligner:
     """
     Aligns data from multiple timeframes to ensure proper time synchronization.
+    Supports any timeframe format (m5/5m, h1/1h, etc.) using TimeframeNormalizer.
     """
-
-    # Timeframe to minutes mapping
-    TIMEFRAME_MINUTES = {
-        '1m': 1,
-        '5m': 5,
-        '15m': 15,
-        '30m': 30,
-        '1h': 60,
-        '4h': 240,
-        '1d': 1440
-    }
 
     def __init__(self, timeframes: List[str]):
         """
         Initialize with list of timeframes to align.
 
         Args:
-            timeframes: List of timeframe strings (e.g., ['1m', '5m', '1h'])
+            timeframes: List of timeframe strings in any format (e.g., ['m5', 'h1'] or ['5m', '1h'])
         """
-        self.timeframes = sorted(timeframes, key=lambda x: self.TIMEFRAME_MINUTES.get(x, 0))
+        # Sort by duration (convert to minutes for comparison)
+        self.timeframes = sorted(
+            timeframes,
+            key=lambda x: TimeframeNormalizer.to_minutes(x) or 0
+        )
         self.base_timeframe = self.timeframes[0]  # Smallest timeframe is base
 
     def align_data(self, data_dict: Dict[str, pd.DataFrame]) -> pd.DataFrame:
@@ -125,12 +120,12 @@ class MultiTimeframeAligner:
 
         Args:
             timestamp: Candle open time
-            timeframe: Timeframe string
+            timeframe: Timeframe string (any format)
 
         Returns:
             Candle close time
         """
-        minutes = MultiTimeframeAligner.TIMEFRAME_MINUTES.get(timeframe, 1)
+        minutes = TimeframeNormalizer.to_minutes(timeframe) or 1
         return timestamp + timedelta(minutes=minutes)
 
     @staticmethod

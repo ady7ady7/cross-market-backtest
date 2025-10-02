@@ -16,6 +16,7 @@ from src.data_fetcher import fetch_market_data
 from src.backtesting import BacktestEngine
 from src.backtesting.example_strategies import SimpleMAStrategy, HTSTrendFollowStrategy
 from src.backtesting.position import PositionConfig
+from src.utils import TimeframeNormalizer
 from .backtest_config import BacktestConfig
 from .backtest_results import BacktestResults
 
@@ -123,14 +124,18 @@ def _run_backtest(config: dict):
                 }
                 strategy = SimpleMAStrategy(config=strategy_config)
             elif config['strategy_type'] == "HTS Trend Follow (Multi-TF)":
-                # HTS strategy requires specific timeframes
-                if '5m' not in config['timeframes'] or '1h' not in config['timeframes']:
-                    st.error("❌ HTS Trend Follow strategy requires both 5m and 1h timeframes to be selected!")
+                # HTS strategy requires 5m and 1h timeframes (any format)
+                # Use normalizer to find matching timeframes
+                m5_match = TimeframeNormalizer.find_matching_timeframe('5m', config['timeframes'])
+                h1_match = TimeframeNormalizer.find_matching_timeframe('1h', config['timeframes'])
+
+                if not m5_match or not h1_match:
+                    st.error("❌ HTS Trend Follow strategy requires both 5-minute and 1-hour timeframes to be selected!")
                     return
 
                 strategy_config = {
                     **config['strategy_params'],
-                    'timeframes': ['5m', '1h'],  # Fixed timeframes for HTS strategy
+                    'timeframes': [m5_match, h1_match],  # Use actual format from data
                     'risk_percent': config['risk_per_trade'],
                     'partial_exits': config.get('partial_exits', [
                         (0.5, 1.5),  # Default: 50% at 1.5R

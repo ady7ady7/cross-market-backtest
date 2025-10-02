@@ -10,6 +10,7 @@ from datetime import datetime
 
 from .strategy import BaseStrategy, StrategySignal
 from .position import PositionSide, Position
+from ..utils import TimeframeNormalizer
 
 
 class SimpleMAStrategy(BaseStrategy):
@@ -202,6 +203,17 @@ class HTSTrendFollowStrategy(BaseStrategy):
             config=default_config
         )
 
+        # Normalize timeframes to handle any format (m5/5m, h1/1h)
+        self.m5_tf = None
+        self.h1_tf = None
+
+        for tf in self.timeframes:
+            tf_standard = TimeframeNormalizer.to_standard(tf)
+            if tf_standard == '5m':
+                self.m5_tf = tf  # Store original format from data
+            elif tf_standard == '1h':
+                self.h1_tf = tf  # Store original format from data
+
         # Track retest state
         self.retest_low = None
         self.retest_high = None
@@ -226,16 +238,19 @@ class HTSTrendFollowStrategy(BaseStrategy):
 
         row = current_row.iloc[0]
 
-        # Get H1 close price
-        h1_close = row.get('1h_close')
+        # Get H1 close price (use dynamic timeframe format)
+        h1_close_col = f'{self.h1_tf}_close'
+        h1_close = row.get(h1_close_col)
         if pd.isna(h1_close):
             return None
 
         # Get Pivot P (needs to be calculated from H1 data)
         # For simplicity, we'll use a rolling pivot approximation
         # In practice, you'd integrate with pivot_points.py
-        h1_high = row.get('1h_high')
-        h1_low = row.get('1h_low')
+        h1_high_col = f'{self.h1_tf}_high'
+        h1_low_col = f'{self.h1_tf}_low'
+        h1_high = row.get(h1_high_col)
+        h1_low = row.get(h1_low_col)
 
         if pd.isna(h1_high) or pd.isna(h1_low):
             return None
@@ -249,9 +264,9 @@ class HTSTrendFollowStrategy(BaseStrategy):
         if len(h1_data) < self.config['h1_ema_slow']:
             return None
 
-        # Calculate H1 EMAs on highs/lows
-        h1_highs = h1_data['1h_high'].dropna().tail(self.config['h1_ema_slow'])
-        h1_lows = h1_data['1h_low'].dropna().tail(self.config['h1_ema_slow'])
+        # Calculate H1 EMAs on highs/lows (use dynamic column names)
+        h1_highs = h1_data[h1_high_col].dropna().tail(self.config['h1_ema_slow'])
+        h1_lows = h1_data[h1_low_col].dropna().tail(self.config['h1_ema_slow'])
 
         if len(h1_highs) < self.config['h1_ema_slow']:
             return None

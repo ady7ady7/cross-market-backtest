@@ -264,7 +264,7 @@ class BacktestConfig:
     def _hts_trend_follow_config() -> Dict[str, Any]:
         """Configuration for HTS Trend Following strategy"""
         st.markdown("**HTS Trend Follow Strategy Settings**")
-        st.info("📊 Multi-timeframe strategy: H1 for trend filter, M5 for entry. Requires both 5m and 1h data!")
+        st.info("📊 Multi-timeframe strategy: H1 for trend filter, M5 for entry. Requires both m5 and h1 timeframes!")
 
         col1, col2 = st.columns(2)
 
