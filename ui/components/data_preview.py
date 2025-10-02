@@ -199,45 +199,48 @@ def show_data_preview():
                 with col_info3:
                     st.metric("Points Shown", f"{current_end - current_start:,}")
 
-                # Navigation controls
-                col_nav1, col_nav2, col_nav3, col_nav4, col_nav5 = st.columns(5)
+                # Navigation controls (only show if we have multiple ranges)
+                if total_ranges > 1:
+                    col_nav1, col_nav2, col_nav3, col_nav4, col_nav5 = st.columns(5)
 
-                with col_nav1:
-                    if st.button("⏮️ First", help="Go to first range"):
-                        st.session_state[slider_key] = 0
-                        st.rerun()
-
-                with col_nav2:
-                    if st.button("⬅️ Previous", help="Go to previous range"):
-                        if st.session_state[slider_key] > 0:
-                            st.session_state[slider_key] -= 1
+                    with col_nav1:
+                        if st.button("⏮️ First", help="Go to first range"):
+                            st.session_state[slider_key] = 0
                             st.rerun()
 
-                with col_nav3:
-                    # Range slider
-                    range_position = st.slider(
-                        "Navigate through data:",
-                        min_value=0,
-                        max_value=max(0, total_ranges - 1),
-                        value=st.session_state[slider_key],
-                        help=f"Slide to navigate through {total_records:,} total records",
-                        key=f"slider_control_{selected_symbol}_{selected_timeframe}"
-                    )
+                    with col_nav2:
+                        if st.button("⬅️ Previous", help="Go to previous range"):
+                            if st.session_state[slider_key] > 0:
+                                st.session_state[slider_key] -= 1
+                                st.rerun()
 
-                    if range_position != st.session_state[slider_key]:
-                        st.session_state[slider_key] = range_position
-                        st.rerun()
+                    with col_nav3:
+                        # Range slider
+                        range_position = st.slider(
+                            "Navigate through data:",
+                            min_value=0,
+                            max_value=total_ranges - 1,
+                            value=st.session_state[slider_key],
+                            help=f"Slide to navigate through {total_records:,} total records",
+                            key=f"slider_control_{selected_symbol}_{selected_timeframe}"
+                        )
 
-                with col_nav4:
-                    if st.button("➡️ Next", help="Go to next range"):
-                        if st.session_state[slider_key] < total_ranges - 1:
-                            st.session_state[slider_key] += 1
+                        if range_position != st.session_state[slider_key]:
+                            st.session_state[slider_key] = range_position
                             st.rerun()
 
-                with col_nav5:
-                    if st.button("⏭️ Last", help="Go to last range"):
-                        st.session_state[slider_key] = max(0, total_ranges - 1)
-                        st.rerun()
+                    with col_nav4:
+                        if st.button("➡️ Next", help="Go to next range"):
+                            if st.session_state[slider_key] < total_ranges - 1:
+                                st.session_state[slider_key] += 1
+                                st.rerun()
+
+                    with col_nav5:
+                        if st.button("⏭️ Last", help="Go to last range"):
+                            st.session_state[slider_key] = max(0, total_ranges - 1)
+                            st.rerun()
+                else:
+                    st.info(f"📍 Showing all {total_records:,} records (no pagination needed)")
 
                 # Progress indicator
                 progress = (st.session_state[slider_key] + 1) / total_ranges if total_ranges > 0 else 0
