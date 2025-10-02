@@ -162,6 +162,237 @@ class MultiTimeframeStrategy(BaseStrategy):
         return False
 
 
+class HTSTrendFollowStrategy(BaseStrategy):
+    """
+    Multi-timeframe HTS Trend Following Strategy.
+
+    Logic:
+    1. H1 Filter: Price must be above/below Pivot P AND HTS crossover bias (EMA33 vs EMA144)
+       - Long: Price > P AND EMA33 channel > EMA144 channel
+       - Short: Price < P AND EMA33 channel < EMA144 channel
+
+    2. M5 Entry: Retest EMA133 channel and return to EMA33 channel
+       - Long: Price dips to EMA133 low, then rallies back above EMA33 low
+       - Short: Price rallies to EMA133 high, then drops back below EMA33 high
+
+    3. Stop Loss: Below/above the EMA133 retest low/high
+
+    4. Take Profit: Partial exits at 1.5R (50%) and 4R (50%)
+    """
+
+    def __init__(self, config: dict = None):
+        default_config = {
+            'h1_ema_fast': 33,
+            'h1_ema_slow': 144,
+            'm5_ema_fast': 33,
+            'm5_ema_slow': 133,
+            'risk_percent': 1.0,
+            'partial_exits': [
+                (0.5, 1.5),  # 50% at 1.5R
+                (0.5, 4.0)   # 50% at 4R
+            ],
+            'timeframes': ['5m', '1h']  # m5 for entry, h1 for trend filter
+        }
+        if config:
+            default_config.update(config)
+
+        super().__init__(
+            name="HTS Trend Follow",
+            timeframes=default_config['timeframes'],
+            config=default_config
+        )
+
+        # Track retest state
+        self.retest_low = None
+        self.retest_high = None
+        self.in_retest = False
+
+    def _calculate_ema(self, prices: pd.Series, period: int) -> float:
+        """Calculate EMA for given prices and period"""
+        if len(prices) < period:
+            return None
+        return prices.ewm(span=period, adjust=False).mean().iloc[-1]
+
+    def _get_h1_trend_bias(self, data: pd.DataFrame, timestamp: datetime) -> Optional[str]:
+        """
+        Determine H1 trend bias using Pivot P and HTS crossover.
+
+        Returns:
+            'bullish', 'bearish', or None
+        """
+        current_row = data[data['timestamp'] == timestamp]
+        if current_row.empty:
+            return None
+
+        row = current_row.iloc[0]
+
+        # Get H1 close price
+        h1_close = row.get('1h_close')
+        if pd.isna(h1_close):
+            return None
+
+        # Get Pivot P (needs to be calculated from H1 data)
+        # For simplicity, we'll use a rolling pivot approximation
+        # In practice, you'd integrate with pivot_points.py
+        h1_high = row.get('1h_high')
+        h1_low = row.get('1h_low')
+
+        if pd.isna(h1_high) or pd.isna(h1_low):
+            return None
+
+        # Calculate pivot point (simplified - previous bar's HLC/3)
+        pivot_p = (h1_high + h1_low + h1_close) / 3
+
+        # Get H1 EMA channels
+        # We need to calculate from aligned data
+        h1_data = data[data['timestamp'] <= timestamp].copy()
+        if len(h1_data) < self.config['h1_ema_slow']:
+            return None
+
+        # Calculate H1 EMAs on highs/lows
+        h1_highs = h1_data['1h_high'].dropna().tail(self.config['h1_ema_slow'])
+        h1_lows = h1_data['1h_low'].dropna().tail(self.config['h1_ema_slow'])
+
+        if len(h1_highs) < self.config['h1_ema_slow']:
+            return None
+
+        # Fast channel (EMA33)
+        ema33_high = self._calculate_ema(h1_highs, self.config['h1_ema_fast'])
+        ema33_low = self._calculate_ema(h1_lows, self.config['h1_ema_fast'])
+
+        # Slow channel (EMA144)
+        ema144_high = self._calculate_ema(h1_highs, self.config['h1_ema_slow'])
+        ema144_low = self._calculate_ema(h1_lows, self.config['h1_ema_slow'])
+
+        if None in [ema33_high, ema33_low, ema144_high, ema144_low]:
+            return None
+
+        # Check trend conditions
+        price_above_pivot = h1_close > pivot_p
+        ema33_above_ema144 = (ema33_high > ema144_high) and (ema33_low > ema144_low)
+
+        if price_above_pivot and ema33_above_ema144:
+            return 'bullish'
+        elif not price_above_pivot and not ema33_above_ema144:
+            return 'bearish'
+
+        return None
+
+    def _check_m5_entry(self, data: pd.DataFrame, timestamp: datetime, trend_bias: str) -> Optional[StrategySignal]:
+        """
+        Check for M5 entry signal: retest EMA133 and return to EMA33.
+        """
+        current_row = data[data['timestamp'] == timestamp]
+        if current_row.empty:
+            return None
+
+        row = current_row.iloc[0]
+
+        # Get M5 OHLC (base timeframe data)
+        m5_high = row.get('high')
+        m5_low = row.get('low')
+        m5_close = row.get('close')
+
+        if pd.isna(m5_high) or pd.isna(m5_low) or pd.isna(m5_close):
+            return None
+
+        # Calculate M5 EMAs
+        m5_data = data[data['timestamp'] <= timestamp].copy()
+        if len(m5_data) < self.config['m5_ema_slow']:
+            return None
+
+        m5_highs = m5_data['high'].tail(self.config['m5_ema_slow'])
+        m5_lows = m5_data['low'].tail(self.config['m5_ema_slow'])
+
+        # Fast channel (EMA33)
+        ema33_high = self._calculate_ema(m5_highs, self.config['m5_ema_fast'])
+        ema33_low = self._calculate_ema(m5_lows, self.config['m5_ema_fast'])
+
+        # Slow channel (EMA133)
+        ema133_high = self._calculate_ema(m5_highs, self.config['m5_ema_slow'])
+        ema133_low = self._calculate_ema(m5_lows, self.config['m5_ema_slow'])
+
+        if None in [ema33_high, ema33_low, ema133_high, ema133_low]:
+            return None
+
+        # LONG setup: retest EMA133 low and return to EMA33
+        if trend_bias == 'bullish':
+            # Check if we're touching/below EMA133 low (retest)
+            if m5_low <= ema133_low * 1.002:  # 0.2% tolerance
+                self.in_retest = True
+                self.retest_low = m5_low
+
+            # Check if we've returned above EMA33 low (entry trigger)
+            if self.in_retest and m5_close > ema33_low:
+                self.in_retest = False
+                return StrategySignal(
+                    timestamp=timestamp,
+                    side=PositionSide.LONG,
+                    confidence=1.0,
+                    metadata={
+                        'entry_price': m5_close,
+                        'sl_level': self.retest_low,
+                        'ema33_low': ema33_low,
+                        'ema133_low': ema133_low
+                    }
+                )
+
+        # SHORT setup: retest EMA133 high and return to EMA33
+        elif trend_bias == 'bearish':
+            # Check if we're touching/above EMA133 high (retest)
+            if m5_high >= ema133_high * 0.998:  # 0.2% tolerance
+                self.in_retest = True
+                self.retest_high = m5_high
+
+            # Check if we've returned below EMA33 high (entry trigger)
+            if self.in_retest and m5_close < ema33_high:
+                self.in_retest = False
+                return StrategySignal(
+                    timestamp=timestamp,
+                    side=PositionSide.SHORT,
+                    confidence=1.0,
+                    metadata={
+                        'entry_price': m5_close,
+                        'sl_level': self.retest_high,
+                        'ema33_high': ema33_high,
+                        'ema133_high': ema133_high
+                    }
+                )
+
+        return None
+
+    def generate_signals(self, data: pd.DataFrame, timestamp: datetime) -> Optional[StrategySignal]:
+        """Generate signals based on H1 trend and M5 entry logic"""
+        # Step 1: Check H1 trend bias
+        trend_bias = self._get_h1_trend_bias(data, timestamp)
+
+        if trend_bias is None:
+            return None
+
+        # Step 2: Check for M5 entry signal
+        signal = self._check_m5_entry(data, timestamp, trend_bias)
+
+        # If we have a signal, add SL/TP configuration
+        if signal:
+            # Calculate stop loss distance
+            entry_price = signal.metadata['entry_price']
+            sl_level = signal.metadata['sl_level']
+            sl_distance = abs(entry_price - sl_level)
+
+            # Set position config with dynamic SL and partial exits
+            signal.metadata['sl_price'] = sl_level
+            signal.metadata['sl_distance'] = sl_distance
+            signal.metadata['partial_exits'] = self.config['partial_exits']
+
+        return signal
+
+    def should_exit(self, position: Position, data: pd.DataFrame, timestamp: datetime) -> bool:
+        """Exit logic - handled by partial exits and SL/TP in position manager"""
+        # Strategy-specific exit conditions can be added here
+        # For now, rely on automated SL/TP and partial exits
+        return False
+
+
 class PartialExitStrategy(BaseStrategy):
     """
     Strategy demonstrating partial position exits.

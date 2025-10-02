@@ -37,8 +37,9 @@ class PositionConfig:
     risk_percent: float = 1.0
 
     # Stop Loss configurations
-    sl_type: str = 'percent'  # 'percent', 'time', 'condition'
+    sl_type: str = 'percent'  # 'percent', 'time', 'condition', 'price'
     sl_percent: Optional[float] = None  # e.g., 1.0 for 1%
+    sl_price: Optional[float] = None  # Specific price level for SL
     sl_time_bars: Optional[int] = None  # Exit after N bars
     sl_condition: Optional[Callable] = None  # Custom exit condition
 
@@ -268,6 +269,9 @@ class PositionManager:
                 stop_loss = entry_price * (1 - config.sl_percent / 100)
             else:
                 stop_loss = entry_price * (1 + config.sl_percent / 100)
+        elif config.sl_type == 'price':
+            # Use specific price level for stop loss
+            stop_loss = config.sl_price
         else:
             # For time-based or condition-based, use a default % for sizing
             stop_loss = entry_price * 0.99 if side == PositionSide.LONG else entry_price * 1.01

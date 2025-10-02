@@ -14,7 +14,7 @@ import symbols_config
 from src.database import create_db_connection
 from src.data_fetcher import fetch_market_data
 from src.backtesting import BacktestEngine
-from src.backtesting.example_strategies import SimpleMAStrategy
+from src.backtesting.example_strategies import SimpleMAStrategy, HTSTrendFollowStrategy
 from src.backtesting.position import PositionConfig
 from .backtest_config import BacktestConfig
 from .backtest_results import BacktestResults
@@ -122,6 +122,22 @@ def _run_backtest(config: dict):
                     'partial_exits': config.get('partial_exits', [])
                 }
                 strategy = SimpleMAStrategy(config=strategy_config)
+            elif config['strategy_type'] == "HTS Trend Follow (Multi-TF)":
+                # HTS strategy requires specific timeframes
+                if '5m' not in config['timeframes'] or '1h' not in config['timeframes']:
+                    st.error("❌ HTS Trend Follow strategy requires both 5m and 1h timeframes to be selected!")
+                    return
+
+                strategy_config = {
+                    **config['strategy_params'],
+                    'timeframes': ['5m', '1h'],  # Fixed timeframes for HTS strategy
+                    'risk_percent': config['risk_per_trade'],
+                    'partial_exits': config.get('partial_exits', [
+                        (0.5, 1.5),  # Default: 50% at 1.5R
+                        (0.5, 4.0)   # Default: 50% at 4R
+                    ])
+                }
+                strategy = HTSTrendFollowStrategy(config=strategy_config)
             else:
                 st.error("Custom strategies need to be implemented in code")
                 return

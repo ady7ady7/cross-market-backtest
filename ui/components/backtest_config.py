@@ -115,12 +115,14 @@ class BacktestConfig:
 
         config['strategy_type'] = st.selectbox(
             "Strategy Type",
-            ["Simple MA Crossover", "Custom"],
+            ["HTS Trend Follow (Multi-TF)", "Simple MA Crossover", "Custom"],
             help="Select a pre-built strategy or configure custom"
         )
 
         if config['strategy_type'] == "Simple MA Crossover":
             config['strategy_params'] = BacktestConfig._ma_strategy_config()
+        elif config['strategy_type'] == "HTS Trend Follow (Multi-TF)":
+            config['strategy_params'] = BacktestConfig._hts_trend_follow_config()
         else:
             st.info("Custom strategy configuration - implement your strategy in code")
             config['strategy_params'] = {}
@@ -256,4 +258,57 @@ class BacktestConfig:
         return {
             'fast_period': fast_period,
             'slow_period': slow_period
+        }
+
+    @staticmethod
+    def _hts_trend_follow_config() -> Dict[str, Any]:
+        """Configuration for HTS Trend Following strategy"""
+        st.markdown("**HTS Trend Follow Strategy Settings**")
+        st.info("📊 Multi-timeframe strategy: H1 for trend filter, M5 for entry. Requires both 5m and 1h data!")
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            st.markdown("**H1 Filter (Trend)**")
+            h1_ema_fast = st.number_input(
+                "H1 Fast EMA",
+                min_value=10,
+                max_value=100,
+                value=33,
+                step=1,
+                help="Fast EMA period for H1 trend channel"
+            )
+            h1_ema_slow = st.number_input(
+                "H1 Slow EMA",
+                min_value=50,
+                max_value=200,
+                value=144,
+                step=1,
+                help="Slow EMA period for H1 trend channel"
+            )
+
+        with col2:
+            st.markdown("**M5 Entry**")
+            m5_ema_fast = st.number_input(
+                "M5 Fast EMA",
+                min_value=10,
+                max_value=100,
+                value=33,
+                step=1,
+                help="Fast EMA period for M5 entry channel"
+            )
+            m5_ema_slow = st.number_input(
+                "M5 Slow EMA",
+                min_value=50,
+                max_value=200,
+                value=133,
+                step=1,
+                help="Slow EMA period for M5 entry channel (retest level)"
+            )
+
+        return {
+            'h1_ema_fast': h1_ema_fast,
+            'h1_ema_slow': h1_ema_slow,
+            'm5_ema_fast': m5_ema_fast,
+            'm5_ema_slow': m5_ema_slow
         }

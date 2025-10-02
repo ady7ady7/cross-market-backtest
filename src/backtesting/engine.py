@@ -220,13 +220,36 @@ class BacktestEngine:
             if not strategy:
                 continue
 
+            # Create position config (use signal metadata if available for dynamic SL/TP)
+            position_config = strategy.position_config
+
+            # Check if signal has custom SL/TP in metadata
+            if signal.metadata:
+                # Clone the position config to avoid modifying the strategy's default
+                position_config = PositionConfig(
+                    risk_percent=position_config.risk_percent,
+                    sl_type=position_config.sl_type,
+                    sl_percent=position_config.sl_percent,
+                    sl_time_bars=position_config.sl_time_bars,
+                    tp_type=position_config.tp_type,
+                    tp_percent=position_config.tp_percent,
+                    tp_rr_ratio=position_config.tp_rr_ratio,
+                    partial_exits=signal.metadata.get('partial_exits', position_config.partial_exits)
+                )
+
+                # Override SL with signal metadata if provided
+                if 'sl_price' in signal.metadata:
+                    # Use price-based stop loss
+                    position_config.sl_type = 'price'
+                    position_config.sl_price = signal.metadata['sl_price']
+
             # Try to open position
             position = self.position_manager.open_position(
                 strategy_name=strategy_name,
                 entry_time=timestamp,
                 entry_price=current_price,
                 side=signal.side,
-                config=strategy.position_config
+                config=position_config
             )
 
             if position:
