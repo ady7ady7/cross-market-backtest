@@ -111,21 +111,15 @@ class BacktestConfig:
 
         # Strategy configuration
         st.markdown("---")
-        st.markdown("**🎯 Strategy Configuration**")
+        from .strategy_selector import show_strategy_selector
+        config = show_strategy_selector(config)
 
-        config['strategy_type'] = st.selectbox(
-            "Strategy Type",
-            ["HTS Trend Follow (Multi-TF)", "Simple MA Crossover", "Custom"],
-            help="Select a pre-built strategy or configure custom"
-        )
+        # Check if strategy was selected
+        if not config.get('strategy_metadata'):
+            st.info("Please select a strategy to continue")
+            return None
 
-        if config['strategy_type'] == "Simple MA Crossover":
-            config['strategy_params'] = BacktestConfig._ma_strategy_config()
-        elif config['strategy_type'] == "HTS Trend Follow (Multi-TF)":
-            config['strategy_params'] = BacktestConfig._hts_trend_follow_config()
-        else:
-            st.info("Custom strategy configuration - implement your strategy in code")
-            config['strategy_params'] = {}
+        metadata = config['strategy_metadata']
 
         # Position management
         st.markdown("---")
@@ -141,174 +135,107 @@ class BacktestConfig:
         )
 
         # Stop Loss Configuration
-        st.markdown("**🛑 Stop Loss**")
-        config['sl_type'] = st.selectbox(
-            "SL Type",
-            ["percent", "time", "condition"],
-            help="Stop loss type"
-        )
+        # Only show if strategy doesn't control SL
+        if not metadata.uses_custom_sl:
+            st.markdown("**🛑 Stop Loss**")
+            config['sl_type'] = st.selectbox(
+                "SL Type",
+                ["percent", "time", "condition"],
+                help="Stop loss type"
+            )
+        else:
+            st.markdown("**🛑 Stop Loss**")
+            st.info(f"ℹ️ Stop loss is controlled by the strategy ({metadata.default_sl_type})")
+            config['sl_type'] = metadata.default_sl_type
 
-        if config['sl_type'] == 'percent':
-            config['sl_percent'] = st.number_input(
-                "SL %",
-                min_value=0.1,
-                max_value=20.0,
-                value=2.0,
-                step=0.1,
-                help="Stop loss distance as % from entry"
-            )
-        elif config['sl_type'] == 'time':
-            config['sl_time_bars'] = st.number_input(
-                "Exit after N bars",
-                min_value=1,
-                max_value=1000,
-                value=50,
-                step=1,
-                help="Exit position after this many bars"
-            )
+        # SL parameters (only if not strategy-controlled)
+        if not metadata.uses_custom_sl:
+            if config['sl_type'] == 'percent':
+                config['sl_percent'] = st.number_input(
+                    "SL %",
+                    min_value=0.1,
+                    max_value=20.0,
+                    value=2.0,
+                    step=0.1,
+                    help="Stop loss distance as % from entry"
+                )
+            elif config['sl_type'] == 'time':
+                config['sl_time_bars'] = st.number_input(
+                    "Exit after N bars",
+                    min_value=1,
+                    max_value=1000,
+                    value=50,
+                    step=1,
+                    help="Exit position after this many bars"
+                )
 
         # Take Profit Configuration
-        st.markdown("**🎯 Take Profit**")
-        config['tp_type'] = st.selectbox(
-            "TP Type",
-            ["rr", "percent", "condition"],
-            help="Take profit type"
-        )
-
-        if config['tp_type'] == 'rr':
-            config['tp_rr_ratio'] = st.number_input(
-                "Risk:Reward Ratio",
-                min_value=0.5,
-                max_value=10.0,
-                value=2.0,
-                step=0.5,
-                help="Risk:Reward ratio (e.g., 2.0 = 1:2)"
+        # Only show if strategy doesn't control TP
+        if not metadata.uses_custom_tp:
+            st.markdown("**🎯 Take Profit**")
+            config['tp_type'] = st.selectbox(
+                "TP Type",
+                ["rr", "percent", "condition"],
+                help="Take profit type"
             )
-        elif config['tp_type'] == 'percent':
-            config['tp_percent'] = st.number_input(
-                "TP %",
-                min_value=0.1,
-                max_value=50.0,
-                value=4.0,
-                step=0.1,
-                help="Take profit distance as % from entry"
-            )
-
-        # Partial exits
-        st.markdown("**📉 Partial Exits (Optional)**")
-        use_partial_exits = st.checkbox("Enable partial position exits", value=False)
-
-        if use_partial_exits:
-            config['partial_exits'] = []
-            num_exits = st.number_input("Number of partial exits", min_value=1, max_value=5, value=1)
-
-            for i in range(int(num_exits)):
-                col1, col2 = st.columns(2)
-                with col1:
-                    size = st.number_input(
-                        f"Exit {i+1}: Size Fraction",
-                        min_value=0.1,
-                        max_value=1.0,
-                        value=0.5,
-                        step=0.1,
-                        key=f"partial_size_{i}"
-                    )
-                with col2:
-                    rr = st.number_input(
-                        f"Exit {i+1}: At R-Multiple",
-                        min_value=0.5,
-                        max_value=10.0,
-                        value=2.0,
-                        step=0.5,
-                        key=f"partial_rr_{i}"
-                    )
-                config['partial_exits'].append((size, rr))
         else:
-            config['partial_exits'] = []
+            st.markdown("**🎯 Take Profit**")
+            st.info(f"ℹ️ Take profit is controlled by the strategy ({metadata.default_tp_type})")
+            config['tp_type'] = metadata.default_tp_type
+
+        # TP parameters (only if not strategy-controlled)
+        if not metadata.uses_custom_tp:
+            if config['tp_type'] == 'rr':
+                config['tp_rr_ratio'] = st.number_input(
+                    "Risk:Reward Ratio",
+                    min_value=0.5,
+                    max_value=10.0,
+                    value=2.0,
+                    step=0.5,
+                    help="Risk:Reward ratio (e.g., 2.0 = 1:2)"
+                )
+            elif config['tp_type'] == 'percent':
+                config['tp_percent'] = st.number_input(
+                    "TP %",
+                    min_value=0.1,
+                    max_value=50.0,
+                    value=4.0,
+                    step=0.1,
+                    help="Take profit distance as % from entry"
+                )
+
+            # Partial exits (only if not strategy-controlled)
+            st.markdown("**📉 Partial Exits (Optional)**")
+            use_partial_exits = st.checkbox("Enable partial position exits", value=False)
+
+            if use_partial_exits:
+                config['partial_exits'] = []
+                num_exits = st.number_input("Number of partial exits", min_value=1, max_value=5, value=1)
+
+                for i in range(int(num_exits)):
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        size = st.number_input(
+                            f"Exit {i+1}: Size Fraction",
+                            min_value=0.1,
+                            max_value=1.0,
+                            value=0.5,
+                            step=0.1,
+                            key=f"partial_size_{i}"
+                        )
+                    with col2:
+                        rr = st.number_input(
+                            f"Exit {i+1}: At R-Multiple",
+                            min_value=0.5,
+                            max_value=10.0,
+                            value=2.0,
+                            step=0.5,
+                            key=f"partial_rr_{i}"
+                        )
+                    config['partial_exits'].append((size, rr))
+            else:
+                config['partial_exits'] = []
+        else:
+            config['partial_exits'] = []  # Strategy controls partial exits
 
         return config
-
-    @staticmethod
-    def _ma_strategy_config() -> Dict[str, Any]:
-        """Configuration for MA crossover strategy"""
-        st.markdown("**Moving Average Settings**")
-
-        col1, col2 = st.columns(2)
-
-        with col1:
-            fast_period = st.number_input(
-                "Fast MA Period",
-                min_value=5,
-                max_value=200,
-                value=20,
-                step=5,
-                help="Period for fast moving average"
-            )
-
-        with col2:
-            slow_period = st.number_input(
-                "Slow MA Period",
-                min_value=10,
-                max_value=500,
-                value=50,
-                step=10,
-                help="Period for slow moving average"
-            )
-
-        return {
-            'fast_period': fast_period,
-            'slow_period': slow_period
-        }
-
-    @staticmethod
-    def _hts_trend_follow_config() -> Dict[str, Any]:
-        """Configuration for HTS Trend Following strategy"""
-        st.markdown("**HTS Trend Follow Strategy Settings**")
-        st.info("📊 Multi-timeframe strategy: H1 for trend filter, M5 for entry. Requires both m5 and h1 timeframes!")
-
-        col1, col2 = st.columns(2)
-
-        with col1:
-            st.markdown("**H1 Filter (Trend)**")
-            h1_ema_fast = st.number_input(
-                "H1 Fast EMA",
-                min_value=10,
-                max_value=100,
-                value=33,
-                step=1,
-                help="Fast EMA period for H1 trend channel"
-            )
-            h1_ema_slow = st.number_input(
-                "H1 Slow EMA",
-                min_value=50,
-                max_value=200,
-                value=144,
-                step=1,
-                help="Slow EMA period for H1 trend channel"
-            )
-
-        with col2:
-            st.markdown("**M5 Entry**")
-            m5_ema_fast = st.number_input(
-                "M5 Fast EMA",
-                min_value=10,
-                max_value=100,
-                value=33,
-                step=1,
-                help="Fast EMA period for M5 entry channel"
-            )
-            m5_ema_slow = st.number_input(
-                "M5 Slow EMA",
-                min_value=50,
-                max_value=200,
-                value=133,
-                step=1,
-                help="Slow EMA period for M5 entry channel (retest level)"
-            )
-
-        return {
-            'h1_ema_fast': h1_ema_fast,
-            'h1_ema_slow': h1_ema_slow,
-            'm5_ema_fast': m5_ema_fast,
-            'm5_ema_slow': m5_ema_slow
-        }

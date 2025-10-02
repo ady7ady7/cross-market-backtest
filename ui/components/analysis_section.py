@@ -14,8 +14,8 @@ import symbols_config
 from src.database import create_db_connection
 from src.data_fetcher import fetch_market_data
 from src.backtesting import BacktestEngine
-from src.backtesting.example_strategies import SimpleMAStrategy, HTSTrendFollowStrategy
 from src.backtesting.position import PositionConfig
+from src.strategies import get_strategy_class
 from src.utils import TimeframeNormalizer
 from .backtest_config import BacktestConfig
 from .backtest_results import BacktestResults
@@ -108,44 +108,54 @@ def _run_backtest(config: dict):
 
                 data_dict[timeframe] = df
 
-            # Create strategy based on config
-            if config['strategy_type'] == "Simple MA Crossover":
-                strategy_config = {
-                    **config['strategy_params'],
-                    'timeframes': config['timeframes'],  # Pass selected timeframes to strategy
-                    'risk_percent': config['risk_per_trade'],
-                    'sl_type': config['sl_type'],
-                    'sl_percent': config.get('sl_percent'),
-                    'sl_time_bars': config.get('sl_time_bars'),
-                    'tp_type': config['tp_type'],
-                    'tp_percent': config.get('tp_percent'),
-                    'tp_rr_ratio': config.get('tp_rr_ratio'),
-                    'partial_exits': config.get('partial_exits', [])
-                }
-                strategy = SimpleMAStrategy(config=strategy_config)
-            elif config['strategy_type'] == "HTS Trend Follow (Multi-TF)":
-                # HTS strategy requires 5m and 1h timeframes (any format)
-                # Use normalizer to find matching timeframes
-                m5_match = TimeframeNormalizer.find_matching_timeframe('5m', config['timeframes'])
-                h1_match = TimeframeNormalizer.find_matching_timeframe('1h', config['timeframes'])
-
-                if not m5_match or not h1_match:
-                    st.error("❌ HTS Trend Follow strategy requires both 5-minute and 1-hour timeframes to be selected!")
-                    return
-
-                strategy_config = {
-                    **config['strategy_params'],
-                    'timeframes': [m5_match, h1_match],  # Use actual format from data
-                    'risk_percent': config['risk_per_trade'],
-                    'partial_exits': config.get('partial_exits', [
-                        (0.5, 1.5),  # Default: 50% at 1.5R
-                        (0.5, 4.0)   # Default: 50% at 4R
-                    ])
-                }
-                strategy = HTSTrendFollowStrategy(config=strategy_config)
-            else:
-                st.error("Custom strategies need to be implemented in code")
+            # Get strategy class from registry
+            strategy_class = get_strategy_class(config['strategy_id'])
+            if not strategy_class:
+                st.error(f"❌ Strategy '{config['strategy_id']}' not found!")
                 return
+
+            # Get strategy metadata
+            metadata = config['strategy_metadata']
+
+            # Validate required timeframes if specified
+            if metadata.required_timeframes:
+                # Find matching timeframes in user's selection
+                matched_timeframes = []
+                for required_tf in metadata.required_timeframes:
+                    match = TimeframeNormalizer.find_matching_timeframe(required_tf, config['timeframes'])
+                    if not match:
+                        required_str = ', '.join(metadata.required_timeframes)
+                        st.error(f"❌ {metadata.name} requires timeframes: {required_str}")
+                        return
+                    matched_timeframes.append(match)
+
+                # Use matched timeframes in actual database format
+                strategy_timeframes = matched_timeframes
+            else:
+                # Use all selected timeframes
+                strategy_timeframes = config['timeframes']
+
+            # Build strategy config
+            strategy_config = {
+                **config['strategy_params'],  # Strategy-specific parameters
+                'timeframes': strategy_timeframes,
+                'risk_percent': config['risk_per_trade']
+            }
+
+            # Add SL/TP settings only if strategy doesn't control them
+            if not metadata.uses_custom_sl:
+                strategy_config['sl_type'] = config['sl_type']
+                strategy_config['sl_percent'] = config.get('sl_percent')
+                strategy_config['sl_time_bars'] = config.get('sl_time_bars')
+
+            if not metadata.uses_custom_tp:
+                strategy_config['tp_type'] = config['tp_type']
+                strategy_config['tp_percent'] = config.get('tp_percent')
+                strategy_config['tp_rr_ratio'] = config.get('tp_rr_ratio')
+                strategy_config['partial_exits'] = config.get('partial_exits', [])
+
+            # Create strategy instance
+            strategy = strategy_class(config=strategy_config)
 
             # Create and run backtest engine
             backtest = BacktestEngine(
