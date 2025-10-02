@@ -81,6 +81,7 @@ def _run_backtest(config: dict):
             # Load data for all timeframes (reuse cached data if available)
             data_dict = {}
             engine_db = None
+            point_value = None  # Will be extracted from metadata
 
             for timeframe in config['timeframes']:
                 # Get table name from metadata
@@ -94,6 +95,10 @@ def _run_backtest(config: dict):
                     return
 
                 table_name = symbol_info.iloc[0]['table_name']
+
+                # Extract point_value from metadata (same for all timeframes of a symbol)
+                if point_value is None:
+                    point_value = symbol_info.iloc[0].get('point_value', 1.0)
 
                 # Check if data is already loaded in session state
                 if table_name in st.session_state.market_data:
@@ -157,10 +162,16 @@ def _run_backtest(config: dict):
             # Create strategy instance
             strategy = strategy_class(config=strategy_config)
 
-            # Create and run backtest engine
+            # Get point value and compounding setting
+            if point_value is None:
+                point_value = 1.0  # Default if not found in metadata
+
+            # Create and run backtest engine with point_value and compounding
             backtest = BacktestEngine(
                 initial_capital=config['initial_capital'],
-                max_total_risk_percent=config['max_total_risk']
+                max_total_risk_percent=config['max_total_risk'],
+                point_value=point_value,
+                use_compounding=config.get('use_compounding', False)
             )
 
             # Convert dates if provided

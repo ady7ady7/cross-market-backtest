@@ -125,14 +125,22 @@ class BacktestConfig:
         st.markdown("---")
         st.markdown("**📊 Position Management**")
 
-        config['risk_per_trade'] = st.number_input(
-            "Risk Per Trade (%)",
-            min_value=0.1,
-            max_value=10.0,
-            value=1.0,
-            step=0.1,
-            help="% of account to risk per trade"
-        )
+        col1, col2 = st.columns([2, 1])
+        with col1:
+            config['risk_per_trade'] = st.number_input(
+                "Risk Per Trade (%)",
+                min_value=0.1,
+                max_value=10.0,
+                value=1.0,
+                step=0.1,
+                help="% of account to risk per trade"
+            )
+        with col2:
+            config['use_compounding'] = st.checkbox(
+                "Compounding",
+                value=False,
+                help="If ON: risk % of current capital (grows/shrinks). If OFF: risk % of initial capital (fixed)"
+            )
 
         # Stop Loss Configuration
         # Only show if strategy doesn't control SL

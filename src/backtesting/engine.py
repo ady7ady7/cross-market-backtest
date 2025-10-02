@@ -27,16 +27,22 @@ class BacktestEngine:
     """
 
     def __init__(self, initial_capital: float = 10000.0,
-                 max_total_risk_percent: float = 6.0):
+                 max_total_risk_percent: float = 6.0,
+                 point_value: float = 1.0,
+                 use_compounding: bool = False):
         """
         Initialize backtest engine.
 
         Args:
             initial_capital: Starting capital
             max_total_risk_percent: Maximum % at risk across all positions
+            point_value: Dollar value per 1 point of price movement (micro contracts)
+            use_compounding: If True, risk % of current capital; if False, risk % of initial capital
         """
         self.initial_capital = initial_capital
         self.max_total_risk_percent = max_total_risk_percent
+        self.point_value = point_value
+        self.use_compounding = use_compounding
 
         # Components
         self.position_manager: Optional[PositionManager] = None
@@ -107,8 +113,10 @@ class BacktestEngine:
 
         # Initialize position and performance tracking
         self.position_manager = PositionManager(
-            self.initial_capital,
-            self.max_total_risk_percent
+            initial_capital=self.initial_capital,
+            max_total_risk_percent=self.max_total_risk_percent,
+            point_value=self.point_value,
+            use_compounding=self.use_compounding
         )
         self.performance_tracker = PerformanceTracker(self.initial_capital)
 

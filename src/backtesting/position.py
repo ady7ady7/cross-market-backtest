@@ -65,13 +65,14 @@ class Position:
     entry_time: datetime
     entry_price: float
     side: PositionSide
-    size: float  # Position size in base currency
+    size: float  # Position size in units
     initial_size: float  # Original size before partial exits
 
     # Risk management
     stop_loss: Optional[float] = None
     take_profit: Optional[float] = None
     risk_amount: float = 0.0  # Dollar amount risked
+    point_value: float = 1.0  # Dollar value per 1 point of price movement
 
     # Exit details
     exit_time: Optional[datetime] = None
@@ -99,27 +100,37 @@ class Position:
 
     @property
     def unrealized_pnl(self) -> float:
-        """Calculate unrealized P&L"""
+        """Calculate unrealized P&L using point value system"""
         if not self.is_open:
             return 0.0
 
+        # Get point value from position metadata (stored during position creation)
+        point_value = getattr(self, 'point_value', 1.0)
+
         if self.side == PositionSide.LONG:
-            return (self.current_price - self.entry_price) * self.size
+            price_change_points = self.current_price - self.entry_price
         else:
-            return (self.entry_price - self.current_price) * self.size
+            price_change_points = self.entry_price - self.current_price
+
+        return price_change_points * point_value * self.size
 
     @property
     def realized_pnl(self) -> float:
-        """Calculate realized P&L"""
+        """Calculate realized P&L using point value system"""
         if self.is_open:
             return 0.0
 
-        if self.side == PositionSide.LONG:
-            pnl = (self.exit_price - self.entry_price) * self.initial_size
-        else:
-            pnl = (self.entry_price - self.exit_price) * self.initial_size
+        # Get point value from position metadata
+        point_value = getattr(self, 'point_value', 1.0)
 
-        # Add partial exits P&L
+        if self.side == PositionSide.LONG:
+            price_change_points = self.exit_price - self.entry_price
+        else:
+            price_change_points = self.entry_price - self.exit_price
+
+        pnl = price_change_points * point_value * self.initial_size
+
+        # Add partial exits P&L (already calculated with point value when partial exit occurred)
         for exit_record in self.partial_exit_history:
             pnl += exit_record['pnl']
 
@@ -164,11 +175,13 @@ class Position:
         exit_size = self.size * size_fraction
         self.size -= exit_size
 
-        # Calculate P&L for this partial exit
+        # Calculate P&L for this partial exit using point value
         if self.side == PositionSide.LONG:
-            pnl = (exit_price - self.entry_price) * exit_size
+            price_change_points = exit_price - self.entry_price
         else:
-            pnl = (self.entry_price - exit_price) * exit_size
+            price_change_points = self.entry_price - exit_price
+
+        pnl = price_change_points * self.point_value * exit_size
 
         # Record partial exit
         self.partial_exit_history.append({
@@ -187,17 +200,22 @@ class PositionManager:
     Manages multiple positions with risk controls.
     """
 
-    def __init__(self, initial_capital: float, max_total_risk_percent: float = 6.0):
+    def __init__(self, initial_capital: float, max_total_risk_percent: float = 6.0,
+                 point_value: float = 1.0, use_compounding: bool = False):
         """
         Initialize position manager.
 
         Args:
             initial_capital: Starting account balance
             max_total_risk_percent: Maximum % of capital at risk across all open positions
+            point_value: Dollar value per 1 point of price movement (default 1.0 for micro contracts)
+            use_compounding: If True, use current capital for risk calc; if False, use initial capital
         """
         self.initial_capital = initial_capital
         self.current_capital = initial_capital
         self.max_total_risk_percent = max_total_risk_percent
+        self.point_value = point_value
+        self.use_compounding = use_compounding
 
         self.open_positions: Dict[str, Position] = {}
         self.closed_positions: List[Position] = []
@@ -222,7 +240,9 @@ class PositionManager:
     def calculate_position_size(self, entry_price: float, stop_loss: float,
                                config: PositionConfig, side: PositionSide) -> tuple:
         """
-        Calculate position size based on risk parameters.
+        Calculate position size based on risk parameters using point value system.
+
+        Formula: position_size = risk_amount / (risk_in_points * point_value)
 
         Args:
             entry_price: Entry price
@@ -233,20 +253,29 @@ class PositionManager:
         Returns:
             Tuple of (position_size, risk_amount)
         """
-        # Calculate risk per unit
+        # Calculate risk in points
         if side == PositionSide.LONG:
-            risk_per_unit = entry_price - stop_loss
+            risk_in_points = entry_price - stop_loss
         else:
-            risk_per_unit = stop_loss - entry_price
+            risk_in_points = stop_loss - entry_price
 
-        if risk_per_unit <= 0:
-            raise ValueError("Invalid stop loss: no risk defined")
+        if risk_in_points <= 0:
+            raise ValueError(f"Invalid stop loss: no risk defined (Entry={entry_price}, SL={stop_loss}, Side={side})")
+
+        # Use initial capital if not compounding, current capital if compounding
+        capital_for_risk = self.current_capital if self.use_compounding else self.initial_capital
 
         # Calculate dollar risk amount
-        risk_amount = self.current_capital * (config.risk_percent / 100)
+        risk_amount = capital_for_risk * (config.risk_percent / 100)
 
-        # Calculate position size
-        position_size = risk_amount / risk_per_unit
+        # Calculate position size using point value
+        # position_size = risk_$ / (risk_points * $_per_point)
+        position_size = risk_amount / (risk_in_points * self.point_value)
+
+        # Debug: Log first 3 positions to verify sizing
+        if self._next_position_id <= 3:
+            print(f"   Position sizing: Risk ${risk_amount:.2f} over {risk_in_points:.2f} points")
+            print(f"   Point value: ${self.point_value}, Position size: {position_size:.4f} units")
 
         return position_size, risk_amount
 
@@ -311,8 +340,14 @@ class PositionManager:
             initial_size=size,
             stop_loss=stop_loss,
             take_profit=take_profit,
-            risk_amount=risk_amount
+            risk_amount=risk_amount,
+            point_value=self.point_value
         )
+
+        # Debug: Log first 3 positions
+        if self._next_position_id <= 3:
+            print(f"   Opened position #{self._next_position_id}: {side.value} {size:.4f} units @ {entry_price:.2f}")
+            print(f"   SL: {stop_loss:.2f}, TP: {take_profit:.2f if take_profit else 'None'}, Risk: ${risk_amount:.2f}")
 
         self._next_position_id += 1
         self.open_positions[position.id] = position
