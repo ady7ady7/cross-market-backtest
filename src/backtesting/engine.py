@@ -11,7 +11,7 @@ from datetime import datetime
 
 from .data_alignment import MultiTimeframeAligner
 from .strategy import BaseStrategy, MultiStrategyComposer, StrategySignal
-from .position import PositionManager, PositionSide, ExitType
+from .position import PositionManager, PositionSide, ExitType, PositionConfig
 from .performance import PerformanceTracker, PerformanceMetrics
 
 
