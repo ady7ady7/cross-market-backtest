@@ -340,13 +340,19 @@ class HTSTrendFollowStrategy(BaseStrategy):
             # Check if we've returned above EMA33 low (entry trigger)
             if self.in_retest and m5_close > ema33_low:
                 self.in_retest = False
+
+                # Ensure SL is below entry (add small buffer if needed)
+                sl_level = self.retest_low
+                if sl_level >= m5_close:
+                    sl_level = m5_close * 0.999  # 0.1% below entry as minimum
+
                 return StrategySignal(
                     timestamp=timestamp,
                     side=PositionSide.LONG,
                     confidence=1.0,
                     metadata={
                         'entry_price': m5_close,
-                        'sl_level': self.retest_low,
+                        'sl_level': sl_level,
                         'ema33_low': ema33_low,
                         'ema133_low': ema133_low
                     }
@@ -362,13 +368,19 @@ class HTSTrendFollowStrategy(BaseStrategy):
             # Check if we've returned below EMA33 high (entry trigger)
             if self.in_retest and m5_close < ema33_high:
                 self.in_retest = False
+
+                # Ensure SL is above entry (add small buffer if needed)
+                sl_level = self.retest_high
+                if sl_level <= m5_close:
+                    sl_level = m5_close * 1.001  # 0.1% above entry as minimum
+
                 return StrategySignal(
                     timestamp=timestamp,
                     side=PositionSide.SHORT,
                     confidence=1.0,
                     metadata={
                         'entry_price': m5_close,
-                        'sl_level': self.retest_high,
+                        'sl_level': sl_level,
                         'ema33_high': ema33_high,
                         'ema133_high': ema133_high
                     }
