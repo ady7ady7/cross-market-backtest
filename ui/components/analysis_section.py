@@ -47,13 +47,13 @@ def show_analysis_section():
 
         col1, col2, col3 = st.columns([2, 1, 1])
         with col1:
-            run_button = st.button("🚀 Run Backtest", type="primary", use_container_width=True)
+            run_button = st.button("🚀 Run Backtest", type="primary", width="stretch")
         with col2:
-            if st.button("📋 Save Config", use_container_width=True):
+            if st.button("📋 Save Config", width="stretch"):
                 st.session_state.saved_backtest_config = config
                 st.success("Configuration saved!")
         with col3:
-            if st.button("🔄 Reset", use_container_width=True):
+            if st.button("🔄 Reset", width="stretch"):
                 if 'backtest_results' in st.session_state:
                     del st.session_state.backtest_results
                 st.rerun()

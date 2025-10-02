@@ -160,7 +160,7 @@ class BacktestResults:
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
         )
 
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
         # Statistics
         col1, col2, col3 = st.columns(3)
@@ -227,7 +227,7 @@ class BacktestResults:
             showlegend=True
         )
 
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
         # Drawdown statistics
         col1, col2, col3, col4 = st.columns(4)
@@ -274,7 +274,7 @@ class BacktestResults:
                     yaxis_title="Number of Trades",
                     height=300
                 )
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width="stretch")
 
             with col2:
                 # R-multiple distribution
@@ -291,7 +291,7 @@ class BacktestResults:
                     yaxis_title="Number of Trades",
                     height=300
                 )
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width="stretch")
 
         # Trade log table
         st.markdown("**Recent Trades**")
@@ -305,7 +305,7 @@ class BacktestResults:
 
             st.dataframe(
                 display_df.tail(50),
-                use_container_width=True,
+                width="stretch",
                 hide_index=True
             )
 
@@ -380,4 +380,4 @@ class BacktestResults:
 
         if comparison_data:
             df = pd.DataFrame(comparison_data)
-            st.dataframe(df, use_container_width=True, hide_index=True)
+            st.dataframe(df, width="stretch", hide_index=True)
