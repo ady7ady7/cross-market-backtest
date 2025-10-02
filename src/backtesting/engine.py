@@ -85,6 +85,9 @@ class BacktestEngine:
 
         print(f"Running backtest on {len(self.aligned_data)} bars...")
 
+        if len(self.aligned_data) == 0:
+            raise ValueError("No data available after alignment and date filtering. Check your data and date range.")
+
         # Run backtest loop
         self._run_backtest_loop()
 
@@ -115,9 +118,14 @@ class BacktestEngine:
         """Main backtest loop iterating through each bar"""
         base_timeframe = self.data_aligner.base_timeframe
 
+        bar_count = 0
         for idx, row in self.aligned_data.iterrows():
-            timestamp = row['timestamp']
-            current_price = row['close']
+            try:
+                timestamp = row['timestamp']
+                current_price = row['close']
+            except KeyError as e:
+                print(f"Column error: {e}. Available columns: {self.aligned_data.columns.tolist()}")
+                raise
 
             # Update all open positions with current price
             self.position_manager.update_positions(timestamp, current_price)
@@ -144,6 +152,10 @@ class BacktestEngine:
                 self.position_manager.current_capital,
                 open_pnl
             )
+
+            bar_count += 1
+
+        print(f"Processed {bar_count} bars")
 
     def _check_exits(self, timestamp: datetime, current_price: float):
         """Check all positions for exit conditions"""
@@ -282,10 +294,9 @@ class BacktestEngine:
             strategy_closed = [p for p in strategy_positions if not p.is_open]
 
             if strategy_closed:
-                strategy_tracker = PerformanceTracker(self.initial_capital)
-                # Note: This is simplified - in reality you'd need to track
-                # per-strategy equity curves separately
-                strategy_metrics[strategy.name] = strategy_tracker.calculate_metrics(
+                # Note: Per-strategy metrics are calculated based on trades only
+                # without separate equity curves (simplified approach)
+                strategy_metrics[strategy.name] = self._calculate_strategy_metrics(
                     strategy_closed
                 )
 
@@ -307,6 +318,33 @@ class BacktestEngine:
         }
 
         return results
+
+    def _calculate_strategy_metrics(self, closed_positions: List) -> Dict:
+        """
+        Calculate basic metrics for a strategy based on its trades only.
+        This is a simplified version that doesn't require equity curve data.
+        """
+        if not closed_positions:
+            return {}
+
+        total_trades = len(closed_positions)
+        winning_trades = sum(1 for p in closed_positions if p.realized_pnl > 0)
+        losing_trades = sum(1 for p in closed_positions if p.realized_pnl < 0)
+
+        total_pnl = sum(p.realized_pnl for p in closed_positions)
+        wins = [p.realized_pnl for p in closed_positions if p.realized_pnl > 0]
+        losses = [p.realized_pnl for p in closed_positions if p.realized_pnl < 0]
+
+        return {
+            'total_trades': total_trades,
+            'winning_trades': winning_trades,
+            'losing_trades': losing_trades,
+            'win_rate': (winning_trades / total_trades * 100) if total_trades > 0 else 0,
+            'total_pnl': total_pnl,
+            'avg_win': sum(wins) / len(wins) if wins else 0,
+            'avg_loss': sum(losses) / len(losses) if losses else 0,
+            'profit_factor': abs(sum(wins) / sum(losses)) if losses and sum(losses) != 0 else 0
+        }
 
     def _create_summary(self, metrics: PerformanceMetrics) -> Dict:
         """Create a text summary of results"""

@@ -139,7 +139,10 @@ class PerformanceTracker:
             PerformanceMetrics object
         """
         if not self.equity_values:
-            raise ValueError("No equity data to calculate metrics")
+            print(f"Debug: equity_timestamps count: {len(self.equity_timestamps)}")
+            print(f"Debug: equity_curve count: {len(self.equity_curve)}")
+            print(f"Debug: closed_positions count: {len(closed_positions)}")
+            raise ValueError("No equity data to calculate metrics. The backtest loop may not have run or update() was never called.")
 
         final_capital = self.equity_values[-1]
 
