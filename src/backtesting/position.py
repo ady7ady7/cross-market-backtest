@@ -272,9 +272,19 @@ class PositionManager:
         elif config.sl_type == 'price':
             # Use specific price level for stop loss
             stop_loss = config.sl_price
+            if stop_loss is None:
+                # Fallback to 1% if price is not set
+                stop_loss = entry_price * 0.99 if side == PositionSide.LONG else entry_price * 1.01
         else:
             # For time-based or condition-based, use a default % for sizing
             stop_loss = entry_price * 0.99 if side == PositionSide.LONG else entry_price * 1.01
+
+        # Validate stop loss
+        if stop_loss is None:
+            stop_loss = entry_price * 0.99 if side == PositionSide.LONG else entry_price * 1.01
+
+        # Debug output
+        print(f"Debug - Entry: {entry_price}, SL: {stop_loss}, Side: {side}, SL Type: {config.sl_type}")
 
         # Calculate position size
         size, risk_amount = self.calculate_position_size(entry_price, stop_loss, config, side)

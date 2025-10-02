@@ -378,6 +378,11 @@ class HTSTrendFollowStrategy(BaseStrategy):
 
     def generate_signals(self, data: pd.DataFrame, timestamp: datetime) -> Optional[StrategySignal]:
         """Generate signals based on H1 trend and M5 entry logic"""
+        # Validate that we have the required timeframes
+        if self.m5_tf is None or self.h1_tf is None:
+            print(f"Warning: Missing timeframes - m5: {self.m5_tf}, h1: {self.h1_tf}")
+            return None
+
         # Step 1: Check H1 trend bias
         trend_bias = self._get_h1_trend_bias(data, timestamp)
 
