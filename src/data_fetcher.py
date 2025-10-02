@@ -5,7 +5,8 @@ def read_symbol_metadata(engine):
     print("Reading symbol metadata...")
     query = "SELECT * FROM symbol_metadata"
     metadata_df = pd.read_sql(query, engine)
-    print(f"Found {len(metadata_df)} symbols in metadata")
+    unique_symbols = metadata_df['symbol'].nunique()
+    print(f"Found {unique_symbols} unique symbols ({len(metadata_df)} tables total)")
     print("\nMetadata preview:")
     print(metadata_df.head(10))
     return metadata_df

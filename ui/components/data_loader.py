@@ -40,12 +40,13 @@ def load_data():
         st.subheader("📊 Available Symbols Overview")
         col1, col2, col3 = st.columns(3)
         with col1:
-            st.metric("Total Symbols", len(metadata_df))
+            unique_symbols = metadata_df['symbol'].nunique()
+            st.metric("Total Symbols", unique_symbols)
         with col2:
-            tradfi_count = len(metadata_df[metadata_df['asset_type'] == 'tradfi'])
+            tradfi_count = metadata_df[metadata_df['asset_type'] == 'tradfi']['symbol'].nunique()
             st.metric("TradFi Assets", tradfi_count)
         with col3:
-            crypto_count = len(metadata_df[metadata_df['asset_type'] == 'crypto'])
+            crypto_count = metadata_df[metadata_df['asset_type'] == 'crypto']['symbol'].nunique()
             st.metric("Crypto Assets", crypto_count)
 
     except Exception as e:
