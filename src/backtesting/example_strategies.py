@@ -219,6 +219,17 @@ class HTSTrendFollowStrategy(BaseStrategy):
         self.retest_high = None
         self.in_retest = False
 
+        # Cache for pre-calculated indicators
+        self.indicators_calculated = False
+        self.h1_ema33_high = None
+        self.h1_ema33_low = None
+        self.h1_ema144_high = None
+        self.h1_ema144_low = None
+        self.m5_ema33_high = None
+        self.m5_ema33_low = None
+        self.m5_ema133_high = None
+        self.m5_ema133_low = None
+
     def _calculate_ema(self, prices: pd.Series, period: int) -> float:
         """Calculate EMA for given prices and period"""
         if len(prices) < period:
@@ -258,28 +269,19 @@ class HTSTrendFollowStrategy(BaseStrategy):
         # Calculate pivot point (simplified - previous bar's HLC/3)
         pivot_p = (h1_high + h1_low + h1_close) / 3
 
-        # Get H1 EMA channels
-        # We need to calculate from aligned data
-        h1_data = data[data['timestamp'] <= timestamp].copy()
-        if len(h1_data) < self.config['h1_ema_slow']:
+        # Get current index for EMA lookup
+        current_idx = data[data['timestamp'] == timestamp].index
+        if len(current_idx) == 0:
             return None
+        idx = current_idx[0]
 
-        # Calculate H1 EMAs on highs/lows (use dynamic column names)
-        h1_highs = h1_data[h1_high_col].dropna().tail(self.config['h1_ema_slow'])
-        h1_lows = h1_data[h1_low_col].dropna().tail(self.config['h1_ema_slow'])
+        # Get pre-calculated H1 EMAs at current timestamp
+        ema33_high = self.h1_ema33_high.iloc[idx]
+        ema33_low = self.h1_ema33_low.iloc[idx]
+        ema144_high = self.h1_ema144_high.iloc[idx]
+        ema144_low = self.h1_ema144_low.iloc[idx]
 
-        if len(h1_highs) < self.config['h1_ema_slow']:
-            return None
-
-        # Fast channel (EMA33)
-        ema33_high = self._calculate_ema(h1_highs, self.config['h1_ema_fast'])
-        ema33_low = self._calculate_ema(h1_lows, self.config['h1_ema_fast'])
-
-        # Slow channel (EMA144)
-        ema144_high = self._calculate_ema(h1_highs, self.config['h1_ema_slow'])
-        ema144_low = self._calculate_ema(h1_lows, self.config['h1_ema_slow'])
-
-        if None in [ema33_high, ema33_low, ema144_high, ema144_low]:
+        if pd.isna(ema33_high) or pd.isna(ema33_low) or pd.isna(ema144_high) or pd.isna(ema144_low):
             return None
 
         # Check trend conditions
@@ -311,23 +313,19 @@ class HTSTrendFollowStrategy(BaseStrategy):
         if pd.isna(m5_high) or pd.isna(m5_low) or pd.isna(m5_close):
             return None
 
-        # Calculate M5 EMAs
-        m5_data = data[data['timestamp'] <= timestamp].copy()
-        if len(m5_data) < self.config['m5_ema_slow']:
+        # Get current index for EMA lookup
+        current_idx = data[data['timestamp'] == timestamp].index
+        if len(current_idx) == 0:
             return None
+        idx = current_idx[0]
 
-        m5_highs = m5_data['high'].tail(self.config['m5_ema_slow'])
-        m5_lows = m5_data['low'].tail(self.config['m5_ema_slow'])
+        # Get pre-calculated M5 EMAs at current timestamp
+        ema33_high = self.m5_ema33_high.iloc[idx]
+        ema33_low = self.m5_ema33_low.iloc[idx]
+        ema133_high = self.m5_ema133_high.iloc[idx]
+        ema133_low = self.m5_ema133_low.iloc[idx]
 
-        # Fast channel (EMA33)
-        ema33_high = self._calculate_ema(m5_highs, self.config['m5_ema_fast'])
-        ema33_low = self._calculate_ema(m5_lows, self.config['m5_ema_fast'])
-
-        # Slow channel (EMA133)
-        ema133_high = self._calculate_ema(m5_highs, self.config['m5_ema_slow'])
-        ema133_low = self._calculate_ema(m5_lows, self.config['m5_ema_slow'])
-
-        if None in [ema33_high, ema33_low, ema133_high, ema133_low]:
+        if pd.isna(ema33_high) or pd.isna(ema33_low) or pd.isna(ema133_high) or pd.isna(ema133_low):
             return None
 
         # LONG setup: retest EMA133 low and return to EMA33
@@ -388,11 +386,35 @@ class HTSTrendFollowStrategy(BaseStrategy):
 
         return None
 
+    def _precalculate_indicators(self, data: pd.DataFrame):
+        """Pre-calculate all EMAs once for the entire dataset"""
+        print("Pre-calculating indicators for HTS strategy...")
+
+        # Calculate H1 EMAs
+        h1_high_col = f'{self.h1_tf}_high'
+        h1_low_col = f'{self.h1_tf}_low'
+        self.h1_ema33_high = data[h1_high_col].ewm(span=self.config['h1_ema_fast'], adjust=False).mean()
+        self.h1_ema33_low = data[h1_low_col].ewm(span=self.config['h1_ema_fast'], adjust=False).mean()
+        self.h1_ema144_high = data[h1_high_col].ewm(span=self.config['h1_ema_slow'], adjust=False).mean()
+        self.h1_ema144_low = data[h1_low_col].ewm(span=self.config['h1_ema_slow'], adjust=False).mean()
+
+        # Calculate M5 EMAs
+        self.m5_ema33_high = data['high'].ewm(span=self.config['m5_ema_fast'], adjust=False).mean()
+        self.m5_ema33_low = data['low'].ewm(span=self.config['m5_ema_fast'], adjust=False).mean()
+        self.m5_ema133_high = data['high'].ewm(span=self.config['m5_ema_slow'], adjust=False).mean()
+        self.m5_ema133_low = data['low'].ewm(span=self.config['m5_ema_slow'], adjust=False).mean()
+
+        self.indicators_calculated = True
+        print("Indicators pre-calculated successfully")
+
     def generate_signals(self, data: pd.DataFrame, timestamp: datetime) -> Optional[StrategySignal]:
         """Generate signals based on H1 trend and M5 entry logic"""
+        # Pre-calculate indicators on first call
+        if not self.indicators_calculated:
+            self._precalculate_indicators(data)
+
         # Validate that we have the required timeframes
         if self.m5_tf is None or self.h1_tf is None:
-            print(f"Warning: Missing timeframes - m5: {self.m5_tf}, h1: {self.h1_tf}")
             return None
 
         # Step 1: Check H1 trend bias

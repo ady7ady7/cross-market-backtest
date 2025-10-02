@@ -117,8 +117,11 @@ class BacktestEngine:
     def _run_backtest_loop(self):
         """Main backtest loop iterating through each bar"""
         base_timeframe = self.data_aligner.base_timeframe
+        total_bars = len(self.aligned_data)
 
         bar_count = 0
+        last_progress = 0
+
         for idx, row in self.aligned_data.iterrows():
             try:
                 timestamp = row['timestamp']
@@ -155,7 +158,13 @@ class BacktestEngine:
 
             bar_count += 1
 
-        print(f"Processed {bar_count} bars")
+            # Progress indicator every 10%
+            progress = int((bar_count / total_bars) * 100)
+            if progress >= last_progress + 10:
+                print(f"Progress: {progress}% ({bar_count:,}/{total_bars:,} bars) - Open positions: {len(self.position_manager.open_positions)}")
+                last_progress = progress
+
+        print(f"Completed: Processed {bar_count:,} bars")
 
     def _check_exits(self, timestamp: datetime, current_price: float):
         """Check all positions for exit conditions"""
