@@ -6,8 +6,8 @@ Supports multi-timeframe strategies and composable strategy patterns.
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Dict, Optional, List, Any
-from datetime import datetime
+from typing import Dict, Optional, List, Any, Set
+from datetime import datetime, time
 import pandas as pd
 
 from .position import PositionSide, PositionConfig
@@ -109,6 +109,12 @@ class BaseStrategy(ABC):
         self.config = config or {}
         self.position_config = self._create_position_config()
 
+        # Time and day filters
+        self.allowed_days: Optional[Set[str]] = None  # Day names: 'Monday', 'Tuesday', etc.
+        self.allowed_time_start: Optional[time] = None
+        self.allowed_time_end: Optional[time] = None
+        self._configure_time_filters()
+
     @abstractmethod
     def generate_signals(self, data: pd.DataFrame, timestamp: datetime) -> Optional[StrategySignal]:
         """
@@ -154,6 +160,53 @@ class BaseStrategy(ABC):
             tp_rr_ratio=self.config.get('tp_rr_ratio', 2.0),
             partial_exits=self.config.get('partial_exits', [])
         )
+
+    def _configure_time_filters(self):
+        """Configure time and day filters from config."""
+        # Parse allowed days (e.g., ['Monday', 'Friday'])
+        if 'allowed_days' in self.config:
+            self.allowed_days = set(self.config['allowed_days'])
+
+        # Parse time range (e.g., '10:00-18:00')
+        if 'allowed_time_range' in self.config:
+            time_range = self.config['allowed_time_range']
+            if time_range and '-' in time_range:
+                start_str, end_str = time_range.split('-')
+                try:
+                    start_parts = [int(x) for x in start_str.strip().split(':')]
+                    end_parts = [int(x) for x in end_str.strip().split(':')]
+                    self.allowed_time_start = time(start_parts[0], start_parts[1] if len(start_parts) > 1 else 0)
+                    self.allowed_time_end = time(end_parts[0], end_parts[1] if len(end_parts) > 1 else 0)
+                except (ValueError, IndexError):
+                    pass  # Invalid format, ignore
+
+    def is_trading_time_allowed(self, data: pd.DataFrame, timestamp: datetime) -> bool:
+        """
+        Check if current timestamp is within allowed trading times.
+        Uses existing day_of_week column from dataset.
+
+        Args:
+            data: DataFrame with market data (includes day_of_week column)
+            timestamp: Current timestamp to check
+
+        Returns:
+            True if trading is allowed at this time, False otherwise
+        """
+        # Check day of week using existing day_of_week column from data
+        if self.allowed_days is not None:
+            current_row = data[data['timestamp'] == timestamp]
+            if not current_row.empty:
+                day_name = current_row.iloc[0].get('day_of_week')
+                if day_name and day_name not in self.allowed_days:
+                    return False
+
+        # Check time of day
+        if self.allowed_time_start is not None and self.allowed_time_end is not None:
+            current_time = timestamp.time()
+            if not (self.allowed_time_start <= current_time <= self.allowed_time_end):
+                return False
+
+        return True
 
     def get_indicator_values(self, data: pd.DataFrame, timestamp: datetime,
                             timeframe: str = None) -> Dict[str, float]:
@@ -234,6 +287,10 @@ class MultiStrategyComposer:
         """
         signals = {}
         for strategy in self.strategies:
+            # Check if trading is allowed at this time for this strategy
+            if not strategy.is_trading_time_allowed(data, timestamp):
+                continue
+
             signal = strategy.generate_signals(data, timestamp)
             if signal:
                 signals[strategy.name] = signal

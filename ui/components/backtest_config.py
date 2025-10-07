@@ -121,6 +121,50 @@ class BacktestConfig:
 
         metadata = config['strategy_metadata']
 
+        # Time and Day Filters
+        st.markdown("---")
+        st.markdown("**⏰ Trading Time Filters**")
+
+        use_time_filters = st.checkbox(
+            "Enable time/day filters",
+            value=False,
+            help="Restrict trading to specific days of the week and/or times of day"
+        )
+
+        if use_time_filters:
+            col1, col2 = st.columns(2)
+
+            with col1:
+                st.markdown("**Days of Week**")
+                allowed_days = []
+                day_names = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+
+                for day in day_names:
+                    if st.checkbox(day, value=True, key=f"day_{day}"):
+                        allowed_days.append(day)
+
+                config['allowed_days'] = allowed_days if allowed_days else None
+
+            with col2:
+                st.markdown("**Time of Day (UTC)**")
+                use_time_range = st.checkbox("Enable time range", value=False, key="use_time_range")
+
+                if use_time_range:
+                    time_col1, time_col2 = st.columns(2)
+                    with time_col1:
+                        start_hour = st.number_input("Start Hour", min_value=0, max_value=23, value=10, key="start_hour")
+                        start_minute = st.number_input("Start Minute", min_value=0, max_value=59, value=0, key="start_min")
+                    with time_col2:
+                        end_hour = st.number_input("End Hour", min_value=0, max_value=23, value=18, key="end_hour")
+                        end_minute = st.number_input("End Minute", min_value=0, max_value=59, value=0, key="end_min")
+
+                    config['allowed_time_range'] = f"{start_hour:02d}:{start_minute:02d}-{end_hour:02d}:{end_minute:02d}"
+                else:
+                    config['allowed_time_range'] = None
+        else:
+            config['allowed_days'] = None
+            config['allowed_time_range'] = None
+
         # Position management
         st.markdown("---")
         st.markdown("**📊 Position Management**")

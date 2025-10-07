@@ -147,6 +147,12 @@ def _run_backtest(config: dict):
                 'risk_percent': config['risk_per_trade']
             }
 
+            # Add time/day filters if enabled
+            if config.get('allowed_days') is not None:
+                strategy_config['allowed_days'] = config['allowed_days']
+            if config.get('allowed_time_range') is not None:
+                strategy_config['allowed_time_range'] = config['allowed_time_range']
+
             # Add SL/TP settings only if strategy doesn't control them
             if not metadata.uses_custom_sl:
                 strategy_config['sl_type'] = config['sl_type']
