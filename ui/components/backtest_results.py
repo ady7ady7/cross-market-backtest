@@ -297,11 +297,27 @@ class BacktestResults:
         st.markdown("**Recent Trades**")
 
         if len(exits) > 0:
-            # Create display dataframe
-            display_df = exits[['timestamp', 'strategy', 'exit_type', 'price', 'pnl', 'r_multiple']].copy()
-            display_df['pnl'] = display_df['pnl'].apply(lambda x: f"${x:,.2f}")
-            display_df['r_multiple'] = display_df['r_multiple'].apply(lambda x: f"{x:.2f}R")
-            display_df['price'] = display_df['price'].apply(lambda x: f"${x:.4f}")
+            # Create display dataframe with all important columns
+            display_df = exits[['side', 'entry_time', 'entry_price', 'timestamp', 'exit_type', 'price', 'pnl', 'r_multiple', 'strategy']].copy()
+
+            # Rename columns for clarity
+            display_df = display_df.rename(columns={
+                'side': 'Type',
+                'entry_time': 'Entry Time',
+                'entry_price': 'Entry Price',
+                'timestamp': 'Exit Time',
+                'exit_type': 'Exit Type',
+                'price': 'Exit Price',
+                'pnl': 'P&L',
+                'r_multiple': 'R-Multiple',
+                'strategy': 'Strategy'
+            })
+
+            # Format columns
+            display_df['Entry Price'] = display_df['Entry Price'].apply(lambda x: f"${x:,.4f}")
+            display_df['Exit Price'] = display_df['Exit Price'].apply(lambda x: f"${x:,.4f}")
+            display_df['P&L'] = display_df['P&L'].apply(lambda x: f"${x:,.2f}")
+            display_df['R-Multiple'] = display_df['R-Multiple'].apply(lambda x: f"{x:.2f}R")
 
             st.dataframe(
                 display_df.tail(50),

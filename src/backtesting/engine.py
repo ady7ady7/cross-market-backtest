@@ -306,6 +306,9 @@ class BacktestEngine:
             'timestamp': timestamp,
             'strategy': position.strategy_name,
             'action': 'EXIT',
+            'side': position.side.value,  # LONG or SHORT
+            'entry_time': position.entry_time,
+            'entry_price': position.entry_price,
             'exit_type': exit_type.value,
             'price': exit_price,
             'pnl': position.realized_pnl,
