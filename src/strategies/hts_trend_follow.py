@@ -95,7 +95,7 @@ class HTSTrendFollowStrategy(BaseStrategy):
             'h1_ema_fast': 33,
             'h1_ema_slow': 144,
             'm5_ema_fast': 33,
-            'm5_ema_slow': 133,
+            'm5_ema_slow': 144,
             'risk_percent': 1.0,
             'timeframes': metadata.required_timeframes,
             # Fixed partial exits (strategy-controlled)
