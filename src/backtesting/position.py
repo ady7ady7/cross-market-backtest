@@ -14,6 +14,8 @@ from typing import Optional, Dict, List, Callable
 from datetime import datetime
 from enum import Enum
 
+from src.utils import fmt_price
+
 
 class PositionSide(Enum):
     """Position direction"""
@@ -347,7 +349,7 @@ class PositionManager:
         # Debug: Log first 3 positions
         if self._next_position_id <= 3:
             print(f"   Opened position #{self._next_position_id}: {side.value} {size:.4f} units @ {entry_price:.2f}")
-            print(f"   SL: {stop_loss:.2f}, TP: {take_profit:.2f if take_profit else 'None'}, Risk: ${risk_amount:.2f}")
+            print(f"   SL: {stop_loss:.2f}, TP: {fmt_price(take_profit)}, Risk: ${risk_amount:.2f}")
 
         self._next_position_id += 1
         self.open_positions[position.id] = position
