@@ -6,11 +6,13 @@ A trend-following strategy using H1 trend filter and M5 entries.
 LOGIC:
 1. H1 Filter: Price above/below Pivot P AND EMA33 channel above/below EMA144
 2. M5 Entry: Retest EMA133, then return to EMA33
-3. SL: Below/above the retest low/high (strategy-controlled)
+3. SL: Below/above the farthest EMA (EMA133) with buffer (strategy-controlled)
 4. TP: Partial exits at 1.5R (50%) and 4R (50%) (strategy-controlled)
+5. Risk Management: Maximum ONE position per day
 
 IMPORTANT: This strategy CONTROLS its own SL/TP.
 UI SL/TP settings are IGNORED - strategy uses dynamic levels.
+SL is placed at the farthest EMA to ensure proper risk calculation.
 """
 
 import pandas as pd
@@ -38,7 +40,7 @@ class HTSTrendFollowStrategy(BaseStrategy):
         return StrategyMetadata(
             id='hts_trend',
             name='HTS Trend Follow (Multi-TF)',
-            description='H1 trend filter + M5 entries. Strategy controls SL at retest level, TP at 1.5R/4R.',
+            description='H1 trend filter + M5 entries. SL at farthest EMA (EMA133), TP at 1.5R/4R. Max 1 position/day.',
 
             # Requires both timeframes
             required_timeframes=['5m', '1h'],
@@ -127,6 +129,9 @@ class HTSTrendFollowStrategy(BaseStrategy):
         self.retest_high = None
         self.in_retest = False
 
+        # One position per day tracking
+        self.last_entry_date = None
+
         # Pre-calculated indicators cache
         self.indicators_calculated = False
         self.h1_ema33_high = None
@@ -168,6 +173,11 @@ class HTSTrendFollowStrategy(BaseStrategy):
         if self.m5_tf is None or self.h1_tf is None:
             return None
 
+        # One position per day: Check if we already entered today
+        current_date = timestamp.date()
+        if self.last_entry_date == current_date:
+            return None
+
         # Check H1 trend
         trend_bias = self._get_h1_trend_bias(data, timestamp)
         if trend_bias is None:
@@ -184,6 +194,9 @@ class HTSTrendFollowStrategy(BaseStrategy):
             # IMPORTANT: Set SL in metadata (overrides UI)
             signal.metadata['sl_price'] = sl_level
             signal.metadata['partial_exits'] = self.config['partial_exits']
+
+            # Record entry date to prevent multiple entries today
+            self.last_entry_date = current_date
 
         return signal
 
@@ -259,10 +272,14 @@ class HTSTrendFollowStrategy(BaseStrategy):
             if self.in_retest and m5_close > ema33_low:
                 self.in_retest = False
 
-                # Ensure SL is below entry
-                sl_level = self.retest_low
-                if sl_level >= m5_close:
-                    sl_level = m5_close * 0.999
+                # SL: Place BELOW the farthest EMA (EMA133 for longs)
+                # Add small buffer to ensure we're actually below the EMA
+                sl_level = ema133_low * 0.998
+
+                # Ensure SL is meaningfully below entry (at least 0.3%)
+                min_sl = m5_close * 0.997
+                if sl_level >= min_sl:
+                    sl_level = min_sl
 
                 return StrategySignal(
                     timestamp=timestamp,
@@ -283,10 +300,14 @@ class HTSTrendFollowStrategy(BaseStrategy):
             if self.in_retest and m5_close < ema33_high:
                 self.in_retest = False
 
-                # Ensure SL is above entry
-                sl_level = self.retest_high
-                if sl_level <= m5_close:
-                    sl_level = m5_close * 1.001
+                # SL: Place ABOVE the farthest EMA (EMA133 for shorts)
+                # Add small buffer to ensure we're actually above the EMA
+                sl_level = ema133_high * 1.002
+
+                # Ensure SL is meaningfully above entry (at least 0.3%)
+                max_sl = m5_close * 1.003
+                if sl_level <= max_sl:
+                    sl_level = max_sl
 
                 return StrategySignal(
                     timestamp=timestamp,
